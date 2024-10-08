@@ -1,0 +1,604 @@
+\section{Deep Convolutional GANs}
+
+In this notebook, you'll build a GAN using convolutional layers in the
+generator and discriminator. This is called a Deep Convolutional GAN, or
+DCGAN for short. The DCGAN architecture was first explored in 2016 and
+has seen impressive results in generating new images; you can read the
+\href{https://arxiv.org/pdf/1511.06434.pdf}{original paper, here}.
+
+You'll be training DCGAN on the
+\href{https://www.cs.toronto.edu/~kriz/cifar.html}{CIFAR10} dataset.
+These are color images of different classes, such as airplanes, dogs or
+trucks. This dataset is much more complex and diverse than the MNIST
+dataset and justifies the use of the DCGAN architecture.
+
+So, our goal is to create a DCGAN that can generate new,
+realistic-looking images. We'll go through the following steps to do
+this: 
+\begin{itemize}
+    \item \textbf{Load in and pre-process the CIFAR10 dataset}
+    \item Define discriminator and generator networks
+    \item \textbf{Train these adversarial networks}
+    \item ƒ\textbf{Visualize the loss over time and some sample, generated images}
+\end{itemize}
+
+In this notebook, we will focus on defining the networks.
+
+\paragraph{Deeper Convolutional Networks}
+
+Since this dataset is more complex than our MNIST data, we'll need a
+deeper network to accurately identify patterns in these images and be
+able to generate new ones. Specifically, we'll use a series of
+convolutional or transpose convolutional layers in the discriminator and
+generator. It's also necessary to use batch normalization to get these
+convolutional networks to train.
+
+Besides these changes in network structure, training the discriminator
+and generator networks should be the same as before. That is, the
+discriminator will alternate training on real and fake (generated)
+images, and the generator will aim to trick the discriminator into
+thinking that its generated images are real!
+
+\begin{lstlisting}[language=Python]
+# # run this cell once to install the dependency. 
+# You will have to restart the kernel once the package is installed.
+# !pip install ipywidgets
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# import libraries
+import matplotlib.pyplot as plt
+import numpy as np
+import pickle as pkl
+
+%matplotlib inline
+\end{lstlisting}
+
+\subsection{Getting the data}
+
+Here you can download the CIFAR10 dataset. It's a dataset built-in to
+the PyTorch datasets library. We can load in training data, transform it
+into Tensor datatypes, then create dataloaders to batch our data into a
+desired size.
+
+\begin{lstlisting}[language=Python]
+import torch
+from torchvision import datasets
+from torchvision import transforms
+
+# Tensor transform
+transform = transforms.ToTensor()
+
+# CIFAR training datasets
+cifar_train = datasets.CIFAR10(root='data/', train=True, download=True, transform=transform)
+
+batch_size = 128
+num_workers = 4
+
+# build DataLoaders for CIFAR10 dataset
+train_loader = torch.utils.data.DataLoader(dataset=cifar_train,
+                                          batch_size=batch_size,
+                                          shuffle=True,
+                                          num_workers=num_workers)
+\end{lstlisting}
+
+\subsubsection{Visualize the Data}
+
+Here I'm showing a small sample of the images. Each of these is 32x32
+with 3 color channels (RGB). These are the real, training images that
+we'll pass to the discriminator. Notice that each image has \emph{one}
+associated, numerical label.
+
+\begin{lstlisting}[language=Python]
+# obtain one batch of training images
+dataiter = iter(train_loader)
+images, labels = dataiter.next()
+
+# plot the images in the batch, along with the corresponding labels
+fig = plt.figure(figsize=(25, 4))
+plot_size=20
+for idx in np.arange(plot_size):
+    ax = fig.add_subplot(2, plot_size/2, idx+1, xticks=[], yticks=[])
+    ax.imshow(np.transpose(images[idx], (1, 2, 0)))
+    # print out the correct label for each image
+    # .item() gets the value contained in a Tensor
+    ax.set_title(str(labels[idx].item()))
+\end{lstlisting}
+
+\subsubsection{Pre-processing: scaling from -1 to 1}
+
+We need to do a bit of pre-processing; we know that the output of our
+\lstinline{tanh} activated generator will contain pixel
+values in a range from -1 to 1, and so, we need to rescale our training
+images to a range of -1 to 1. (Right now, they are in a range from 0-1.)
+
+\begin{lstlisting}[language=Python]
+# current range
+img = images[0]
+
+print('Min: ', img.min())
+print('Max: ', img.max())
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# helper scale function
+def scale(x, feature_range=(-1, 1)):
+    ''' Scale takes in an image x and returns that image, scaled
+       with a feature_range of pixel values from -1 to 1. 
+       This function assumes that the input x is already scaled from 0-1.'''
+    # assume x is scaled to (0, 1)
+    # scale to feature_range and return scaled x
+    min_val, max_val = feature_range
+    x = x * (max_val - min_val) + min_val
+    return x
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# scaled range
+scaled_img = scale(img)
+
+print('Scaled min: ', scaled_img.min())
+print('Scaled max: ', scaled_img.max())
+\end{lstlisting}
+
+\section{Define the Model}
+
+A GAN is comprised of two adversarial networks, a discriminator and a
+generator. Let's use the models we created in the previous exercise.
+
+\subsection{Discriminator}
+
+Here you'll build the discriminator. This is a convolutional classifier
+like you've built before, only without any maxpooling layers. 
+\begin{itemize}
+    \item The inputs to the discriminator are 32x32x3 tensor images
+    \item You'll want a few convolutional, hidden layers
+    \item Then a fully connected layer for the output; as before, we want a sigmoid output, but we'll add that in the loss function, \href{https://pytorch.org/docs/stable/nn.html\#bcewithlogitsloss}{BCEWithLogitsLoss}, later
+\end{itemize}
+
+\begin{lstlisting}[language=Python]
+import torch.nn as nn
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+class ConvBlock(nn.Module):
+    """
+    A convolutional block is made of 3 layers: Conv -> BatchNorm -> Activation.
+    args:
+    - in_channels: number of channels in the input to the conv layer
+    - out_channels: number of filters in the conv layer
+    - kernel_size: filter dimension of the conv layer
+    - batch_norm: whether to use batch norm or not
+    """
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, batch_norm: bool = True):
+        super(ConvBlock, self).__init__()
+        
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride=2, padding=1, bias=False)
+        self.batch_norm = batch_norm
+        if self.batch_norm:
+            self.bn = nn.BatchNorm2d(out_channels)
+        self.activation = nn.LeakyReLU(0.2)
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.conv(x)
+        if self.batch_norm:
+            x = self.bn(x)
+        x = self.activation(x)
+        return x
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+class Discriminator(nn.Module):
+    """
+    The discriminator model adapted from the DCGAN paper. It should only contains a few layers.
+    args:
+    - conv_dim: control the number of filters
+    """
+    def __init__(self, conv_dim: int):
+        super(Discriminator, self).__init__()
+
+        # complete init function
+        self.conv_dim = conv_dim
+
+        # 32x32 input
+        self.conv1 = ConvBlock(3, conv_dim, 4, batch_norm=False) # first layer, no batch_norm
+        # 16x16 out
+        self.conv2 = ConvBlock(conv_dim, conv_dim*2, 4)
+        # 8x8 out
+        self.conv3 = ConvBlock(conv_dim*2, conv_dim*4, 4)
+        # 4x4 out
+        
+        self.flatten = nn.Flatten()
+        # final, fully-connected layer
+        self.fc = nn.Linear(conv_dim*4*4*4, 1)
+
+    def forward(self, x):
+        # all hidden layers + leaky relu activation
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        # flatten
+        x = self.flatten(x)
+        # final output layer
+        x = self.fc(x)        
+        return x
+\end{lstlisting}
+
+\subsection{Generator}
+
+Next, you'll build the generator network. The input will be our noise
+vector \lstinline{z}, as before. And, the output will be a
+\(tanh\) output, but this time with size 32x32 which is the size of our
+CIFAR10 images.
+
+\begin{lstlisting}[language=Python]
+class DeconvBlock(nn.Module):
+    """
+    A "de-convolutional" block is made of 3 layers: ConvTranspose -> BatchNorm -> Activation.
+    args:
+    - in_channels: number of channels in the input to the conv layer
+    - out_channels: number of filters in the conv layer
+    - kernel_size: filter dimension of the conv layer
+    - stride: stride of the conv layer
+    - padding: padding of the conv layer
+    - batch_norm: whether to use batch norm or not
+    """
+    def __init__(self, 
+                 in_channels: int, 
+                 out_channels: int, 
+                 kernel_size: int, 
+                 stride: int,
+                 padding: int,
+                 batch_norm: bool = True):
+        super(DeconvBlock, self).__init__()
+        self.deconv = nn.ConvTranspose2d(in_channels, out_channels, kernel_size, stride, padding, bias=False)
+        self.batch_norm = batch_norm
+        if self.batch_norm:
+            self.bn = nn.BatchNorm2d(out_channels)
+        self.activation = nn.ReLU()
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.deconv(x)
+        if self.batch_norm:
+            x = self.bn(x)
+        x = self.activation(x)
+        return x
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+class Generator(nn.Module):
+    """
+    The generator model adapted from DCGAN
+    args:
+    - latent_dim: dimension of the latent vector
+    - conv_dim: control the number of filters in the convtranspose layers
+    """
+    def __init__(self, latent_dim: int, conv_dim: int = 32):
+        super(Generator, self).__init__()
+        # transpose conv layers
+        self.deconv1 = DeconvBlock(latent_dim, conv_dim*4, 4, 1, 0)
+        self.deconv2 = DeconvBlock(conv_dim*4, conv_dim*2, 4, 2, 1)
+        self.deconv3 = DeconvBlock(conv_dim*2, conv_dim, 4, 2, 1)
+        self.deconv4 = nn.ConvTranspose2d(conv_dim, 3, 4, stride=2, padding=1)
+        self.last_activation = nn.Tanh()
+        
+    def forward(self, x):
+        x = self.deconv1(x)
+        x = self.deconv2(x)
+        x = self.deconv3(x)
+        x = self.deconv4(x)
+        x = self.last_activation(x)
+        return x
+    
+\end{lstlisting}
+
+\subsection{Build complete network}
+
+Define your models' hyperparameters and instantiate the discriminator
+and generator from the classes defined above. Make sure you've passed in
+the correct input arguments.
+
+\begin{lstlisting}[language=Python]
+# define hyperparams
+conv_dim = 32
+z_size = 100
+
+# define discriminator and generator
+D = Discriminator(conv_dim)
+G = Generator(latent_dim=z_size, conv_dim=conv_dim)
+\end{lstlisting}
+
+\subsubsection{Training on GPU}
+
+Check if you can train on GPU. If you can, set this as a variable and
+move your models to GPU. \textgreater{} Later, we'll also move any
+inputs our models and loss functions see (real\_images, z, and ground
+truth labels) to GPU as well.
+
+\begin{lstlisting}[language=Python]
+train_on_gpu = torch.cuda.is_available()
+
+if train_on_gpu:
+    # move models to GPU
+    G.cuda()
+    D.cuda()
+    print('GPU available for training. Models moved to GPU')
+else:
+    print('Training on CPU.')
+    
+\end{lstlisting}
+
+\subsection{Discriminator and Generator Losses}
+
+Now we need to calculate the losses. And this will be exactly the same
+as before.
+
+\subsubsection{Discriminator Losses}
+
+\begin{quote}
+\begin{itemize}
+\item For the discriminator, the total loss is the sum of the losses for real and fake images,  \lstinline{d_loss = d_real_loss + d_fake_loss}.
+\item Remember that we want the discriminator to output 1 for real images and 0 for fake images, so we need to set up the losses to reflect that.
+\end{itemize}
+\end{quote}
+
+The losses will by binary cross entropy loss with logits, which we can
+get with
+\href{https://pytorch.org/docs/stable/nn.html\#bcewithlogitsloss}{BCEWithLogitsLoss}.
+This combines a \lstinline{sigmoid} activation function
+\textbf{and} binary cross entropy loss in one function.
+
+For the real images, we want
+\lstinline{D(real_images) = 1}. That is, we want the
+discriminator to classify the real images with a label = 1, indicating
+that these are real. The discriminator loss for the fake data is
+similar. We want \lstinline{D(fake_images) = 0}, where
+the fake images are the \emph{generator output},
+\lstinline{fake_images = G(z)}.
+
+\subsubsection{Generator Loss}
+
+The generator loss will look similar only with flipped labels. The
+generator's goal is to get
+\lstinline{D(fake_images) = 1}. In this case, the labels
+are \textbf{flipped} to represent that the generator is trying to fool
+the discriminator into thinking that the images it generates (fakes) are
+real!
+
+\begin{lstlisting}[language=Python]
+def real_loss(D_out, smooth=False):
+    batch_size = D_out.size(0)
+    # label smoothing
+    if smooth:
+        # smooth, real labels = 0.9
+        labels = torch.ones(batch_size)*0.9
+    else:
+        labels = torch.ones(batch_size) # real labels = 1
+    # move labels to GPU if available     
+    if train_on_gpu:
+        labels = labels.cuda()
+    # binary cross entropy with logits loss
+    criterion = nn.BCEWithLogitsLoss()
+    # calculate loss
+    loss = criterion(D_out.squeeze(), labels)
+    return loss
+
+def fake_loss(D_out):
+    batch_size = D_out.size(0)
+    labels = torch.zeros(batch_size) # fake labels = 0
+    if train_on_gpu:
+        labels = labels.cuda()
+    criterion = nn.BCEWithLogitsLoss()
+    # calculate loss
+    loss = criterion(D_out.squeeze(), labels)
+    return loss
+\end{lstlisting}
+
+\subsection{Optimizers}
+
+Not much new here, but notice how I am using a small learning rate and
+custom parameters for the Adam optimizers, This is based on some
+research into DCGAN model convergence.
+
+\subsubsection{Hyperparameters}
+
+GANs are very sensitive to hyperparameters. A lot of experimentation
+goes into finding the best hyperparameters such that the generator and
+discriminator don't overpower each other. Try out your own
+hyperparameters or read \href{https://arxiv.org/pdf/1511.06434.pdf}{the
+DCGAN paper} to see what worked for them.
+
+\begin{lstlisting}[language=Python]
+import torch.optim as optim
+
+# params
+lr = 0.0002
+beta1=0.5
+beta2=0.999 # default value
+
+# Create optimizers for the discriminator and generator
+d_optimizer = optim.Adam(D.parameters(), lr, [beta1, beta2])
+g_optimizer = optim.Adam(G.parameters(), lr, [beta1, beta2])
+\end{lstlisting}
+
+\subsection{Training}
+
+Training will involve alternating between training the discriminator and
+the generator. We'll use our functions
+\lstinline{real_loss} and
+\lstinline{fake_loss} to help us calculate the
+discriminator losses in all of the following cases.
+
+\subsubsection{Discriminator training}
+
+\begin{enumerate}
+\item Compute the discriminator loss on real, training images\\
+\item Generate fake images
+\item Compute the discriminator loss on fake, generated images\\
+\item Add up real and fake loss
+\item Perform backpropagation + an optimization step to update the discriminator's weights
+\end{enumerate}
+
+\subsubsection{Generator training}
+
+\begin{enumerate}
+\item Generate fake images
+\item Compute the discriminator loss on fake images, using \textbf{flipped} labels!
+\item Perform backpropagation + an optimization step to update the generator's weights
+\end{enumerate}
+
+\paragraph{Saving Samples}
+
+As we train, we'll also print out some loss statistics and save some
+generated ``fake'' samples.
+
+\textbf{Evaluation mode}
+
+Notice that, when we call our generator to create the samples to
+display, we set our model to evaluation mode:
+\lstinline{G.eval()}. That's so the batch normalization
+layers will use the population statistics rather than the batch
+statistics (as they do during training), \emph{and} so dropout layers
+will operate in eval() mode; not turning off any nodes for generating
+samples.
+
+\begin{lstlisting}[language=Python]
+import pickle as pkl
+from datetime import datetime
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# helper function for viewing a list of passed in sample images
+def view_samples(epoch, samples):
+    fig, axes = plt.subplots(figsize=(14,4), nrows=2, ncols=8, sharey=True, sharex=True)
+    for ax, img in zip(axes.flatten(), samples[epoch]):
+        img = img.detach().cpu().numpy()
+        img = np.transpose(img, (1, 2, 0))
+        img = ((img +1)*255 / (2)).astype(np.uint8) # rescale to pixel range (0-255)
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+        im = ax.imshow(img.reshape((32,32,3)))
+    plt.show()
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# training hyperparams
+num_epochs = 10
+
+# keep track of loss and generated, "fake" samples
+samples = []
+losses = []
+
+print_every = 100
+
+# Get some fixed data for sampling. These are images that are held
+# constant throughout training, and allow us to inspect the model's performance
+sample_size=16
+fixed_z = np.random.uniform(-1, 1, size=(sample_size, z_size, 1, 1))
+fixed_z = torch.from_numpy(fixed_z).float()
+
+# train the network
+for epoch in range(num_epochs):
+    
+    for batch_i, (real_images, _) in enumerate(train_loader):
+                
+        batch_size = real_images.size(0)
+        
+        # important rescaling step
+        real_images = scale(real_images)
+        
+        # ============================================
+        #            TRAIN THE DISCRIMINATOR
+        # ============================================
+        
+        d_optimizer.zero_grad()
+        
+        # 1. Train with real images
+
+        # Compute the discriminator losses on real images 
+        if train_on_gpu:
+            real_images = real_images.cuda()
+        
+        D_real = D(real_images)
+        d_real_loss = real_loss(D_real)
+        
+        # 2. Train with fake images
+        
+        # Generate fake images
+        z = np.random.uniform(-1, 1, size=(batch_size, z_size, 1, 1))
+        z = torch.from_numpy(z).float()
+        # move x to GPU, if available
+        if train_on_gpu:
+            z = z.cuda()
+        fake_images = G(z)
+        
+        # Compute the discriminator losses on fake images            
+        D_fake = D(fake_images.detach())
+        d_fake_loss = fake_loss(D_fake)
+        
+        # add up loss and perform backprop
+        d_loss = d_real_loss + d_fake_loss
+        d_loss.backward()
+        d_optimizer.step()
+        
+        
+        # =========================================
+        #            TRAIN THE GENERATOR
+        # =========================================
+        g_optimizer.zero_grad()
+        
+        # 1. Train with fake images and flipped labels
+        
+        # Generate fake images
+        z = np.random.uniform(-1, 1, size=(batch_size, z_size, 1, 1))
+        z = torch.from_numpy(z).float()
+        if train_on_gpu:
+            z = z.cuda()
+        fake_images = G(z)
+        
+        # Compute the discriminator losses on fake images 
+        # using flipped labels!
+        D_fake = D(fake_images)
+        g_loss = real_loss(D_fake) # use real loss to flip labels
+        
+        # perform backprop
+        g_loss.backward()
+        g_optimizer.step()
+
+        # Print some loss stats
+        if batch_i % print_every == 0:
+            # append discriminator loss and generator loss
+            losses.append((d_loss.item(), g_loss.item()))
+            # print discriminator and generator loss
+            time = str(datetime.now()).split('.')[0]
+            print(f'{time} | Epoch [{epoch+1}/{num_epochs}] | Batch {batch_i}/{len(train_loader)} | d_loss: {d_loss.item():.4f} | g_loss: {g_loss.item():.4f}')
+    
+    ## AFTER EACH EPOCH##    
+    # generate and save sample, fake images
+    G.eval() # for generating samples
+    if train_on_gpu:
+        fixed_z = fixed_z.cuda()
+    samples_z = G(fixed_z)
+    samples.append(samples_z)
+    view_samples(-1, samples)
+    G.train() # back to training mode
+
+
+# Save training generator samples
+with open('train_samples.pkl', 'wb') as f:
+    pkl.dump(samples, f)
+\end{lstlisting}
+
+\subsection{Training loss}
+
+Here we'll plot the training losses for the generator and discriminator,
+recorded after each epoch.
+
+\begin{lstlisting}[language=Python]
+fig, ax = plt.subplots()
+losses = np.array(losses)
+plt.plot(losses.T[0], label='Discriminator', alpha=0.5)
+plt.plot(losses.T[1], label='Generator', alpha=0.5)
+plt.title("Training Losses")
+plt.legend()
+\end{lstlisting}

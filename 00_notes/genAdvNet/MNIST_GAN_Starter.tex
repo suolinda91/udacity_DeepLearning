@@ -1,0 +1,621 @@
+\section{Generative Adversarial
+Network}
+
+In this notebook, we'll be building a generative adversarial network
+(GAN) trained on the MNIST dataset. From this, we'll be able to generate
+new handwritten digits! We will use the loss functions and models we
+built in the previous exercises.
+
+The idea behind GANs is that you have two networks, a generator \(G\)
+and a discriminator \(D\), competing against each other. The generator
+makes ``fake'' data to pass to the discriminator. The discriminator also
+sees real training data and predicts if the data it's received is real
+or fake. \textgreater* The generator is trained to fool the
+discriminator, it wants to output data that looks \emph{as close as
+possible} to real, training data. \textgreater* The discriminator is a
+classifier that is trained to figure out which data is real and which is
+fake.
+
+What ends up happening is that the generator learns to make data that is
+indistinguishable from real data to the discriminator.
+
+The general structure of a GAN is shown in the diagram above, using
+MNIST images as data. The latent sample is a random vector that the
+generator uses to construct its fake images. This is often called a
+\textbf{latent vector} and that vector space is called \textbf{latent
+space}. As the generator trains, it figures out how to map latent
+vectors to recognizable images that can fool the discriminator.
+
+In this notebook, we will be using the
+\href{http://yann.lecun.com/exdb/mnist/}{MNIST Dataset}, a dataset of
+handwritten digits. We can use the torch
+\href{https://pytorch.org/vision/stable/datasets.html}{Datasets API} to
+load the whole dataset directly. The MNIST dataset is made of 28x28
+grayscale images.
+
+\begin{lstlisting}[language=Python]
+# # run this cell once to install the dependency. 
+# You will have to restart the kernel once the package is installed.
+!pip install ipywidgets
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+%matplotlib inline
+
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+from torchvision import datasets
+import torchvision.transforms as transforms
+
+# number of subprocesses to use for data loading
+num_workers = 4
+# how many samples per batch to load
+batch_size = 128
+
+# convert data to torch.FloatTensor
+transform = transforms.ToTensor()
+
+# get the training datasets
+train_data = datasets.MNIST(root='data', train=True,
+                                   download=True, transform=transform)
+
+# prepare data loader
+train_loader = torch.utils.data.DataLoader(train_data, 
+                                           batch_size=batch_size,
+                                           num_workers=num_workers)
+\end{lstlisting}
+
+\begin{lstlisting}
+/opt/conda/lib/python3.7/site-packages/torchvision/datasets/mnist.py:498: UserWarning: The given NumPy array is not writable, and PyTorch does not support non-writable tensors. This means writing to this tensor will result in undefined behavior. You may want to copy the array to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at  ../torch/csrc/utils/tensor_numpy.cpp:178.)
+  return torch.from_numpy(parsed.astype(m[2], copy=False)).view(*s)
+\end{lstlisting}
+
+\subsubsection{Visualize the data}
+
+We visualize a single random example of the MNIST dataset. You can rerun
+this cell multiple times to see different logits.
+
+\begin{lstlisting}[language=Python]
+# obtain one batch of training images
+rand_index = np.random.randint(0, len(train_data), 1)[0]
+images = train_data[rand_index][0]
+label = train_data[rand_index][1]
+images = images.numpy()
+
+# get one image from the batch
+img = np.squeeze(images[0])
+
+fig = plt.figure(figsize = (3,3)) 
+ax = fig.add_subplot(111)
+ax.imshow(img, cmap='gray')
+plt.title(f'Label: {label}')
+plt.show()
+\end{lstlisting}
+
+
+\includegraphics{img/genAdvNet/gan/output_6_0.png}
+
+\section{Define the Model}
+
+A GAN is comprised of two adversarial networks, a discriminator and a
+generator. In this exercise, we will be using the Generator and
+Discriminator we previously built.
+
+\subsection{Discriminator}
+
+\begin{lstlisting}[language=Python]
+import torch.nn as nn
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+class Discriminator(nn.Module):
+    def __init__(self, input_size: int, hidden_dim: int):
+        super(Discriminator, self).__init__()
+        # define hidden linear layers
+        self.fc1 = nn.Linear(input_size, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim // 2)
+        self.fc3 = nn.Linear(hidden_dim // 2, hidden_dim // 4)
+        
+        # define the final layer
+        self.fc4 = nn.Linear(hidden_dim // 4, 1)        
+        
+        # define the dropout
+        self.dropout = nn.Dropout(0.3)
+        
+        # define the activation
+        self.activation = nn.LeakyReLU(0.2)
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # flatten image
+        x = x.view(-1, 28*28)
+        
+        x = self.fc1(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+
+        x = self.fc2(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+
+        x = self.fc3(x)
+        x = self.activation(x)
+        x = self.dropout(x)
+        
+        # we are using BCE with logits loss so the last activation is not required
+        x = self.fc4(x)
+        return x
+\end{lstlisting}
+
+\subsection{Generator}
+
+\begin{lstlisting}[language=Python]
+class Generator(nn.Module):
+    def __init__(self, latent_dim: int, hidden_dim: int, output_size: int):
+        super(Generator, self).__init__()
+        # define hidden linear layers
+        self.fc1 = nn.Linear(latent_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim*2)
+        self.fc3 = nn.Linear(hidden_dim*2, hidden_dim*4)
+        
+        # final fully-connected layer
+        self.fc4 = nn.Linear(hidden_dim*4, output_size)
+        
+        # define the activation
+        self.activation = nn.LeakyReLU(0.2)
+        self.final_activation = nn.Tanh()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.fc1(x)
+        x = self.activation(x)
+
+        x = self.fc2(x)
+        x = self.activation(x)
+
+        x = self.fc3(x)
+        x = self.activation(x)
+        
+        x = self.fc4(x)
+        x = self.final_activation(x)
+        return x
+\end{lstlisting}
+
+\subsection{Model hyperparameters}
+
+\begin{lstlisting}[language=Python]
+# Discriminator hyperparams
+
+# Size of input image to discriminator (28*28)
+input_size = 784
+# Size of last hidden layer in the discriminator
+d_hidden_size = 128
+
+# Generator hyperparams
+
+# Size of latent vector to give to generator
+z_size = 100
+# Size of discriminator output (generated image)
+g_output_size = 784
+# Size of first hidden layer in the generator
+g_hidden_size = 32
+\end{lstlisting}
+
+\subsection{Build complete network}
+
+Now we're instantiating the discriminator and generator from the classes
+defined above. Make sure you've passed in the correct input arguments.
+
+\begin{lstlisting}[language=Python]
+# instantiate discriminator and generator
+D = Discriminator(input_size, d_hidden_size)
+G = Generator(z_size, g_hidden_size, g_output_size)
+
+# check that they are as you expect
+print(D)
+print()
+print(G)
+\end{lstlisting}
+
+\begin{lstlisting}
+Discriminator(
+  (fc1): Linear(in_features=784, out_features=128, bias=True)
+  (fc2): Linear(in_features=128, out_features=64, bias=True)
+  (fc3): Linear(in_features=64, out_features=32, bias=True)
+  (fc4): Linear(in_features=32, out_features=1, bias=True)
+  (dropout): Dropout(p=0.3, inplace=False)
+  (activation): LeakyReLU(negative_slope=0.2)
+)
+
+Generator(
+  (fc1): Linear(in_features=100, out_features=32, bias=True)
+  (fc2): Linear(in_features=32, out_features=64, bias=True)
+  (fc3): Linear(in_features=64, out_features=128, bias=True)
+  (fc4): Linear(in_features=128, out_features=784, bias=True)
+  (activation): LeakyReLU(negative_slope=0.2)
+  (final_activation): Tanh()
+)
+\end{lstlisting}
+
+\subsection{Discriminator and Generator
+Losses}
+
+Now we need to calculate the losses. For this exercise, we will use the
+loss functions we previously implemented.
+
+\begin{lstlisting}[language=Python]
+# Calculate losses
+def real_loss(D_out, smooth=False):
+    batch_size = D_out.size(0)
+    # label smoothing
+    if smooth:
+        # smooth, real labels = 0.9
+        labels = torch.ones(batch_size)*0.9
+    else:
+        labels = torch.ones(batch_size) # real labels = 1
+        
+    # numerically stable loss
+    criterion = nn.BCEWithLogitsLoss()
+    # calculate loss
+    loss = criterion(D_out.squeeze(), labels)
+    return loss
+
+def fake_loss(D_out):
+    batch_size = D_out.size(0)
+    labels = torch.zeros(batch_size) # fake labels = 0
+    criterion = nn.BCEWithLogitsLoss()
+    # calculate loss
+    loss = criterion(D_out.squeeze(), labels)
+    return loss
+\end{lstlisting}
+
+\subsection{Optimizers}
+
+We want to update the generator and discriminator variables separately.
+So, we'll define two separate Adam optimizers.
+
+\begin{lstlisting}[language=Python]
+import torch.optim as optim
+
+# Optimizers
+lr = 0.0002
+
+# Create optimizers for the discriminator and generator
+d_optimizer = optim.Adam(D.parameters(), lr)
+g_optimizer = optim.Adam(G.parameters(), lr)
+\end{lstlisting}
+
+\subsection{Training}
+
+Training will involve alternating between training the discriminator and
+the generator. We'll use our functions
+\lstinline{real_loss} and
+\lstinline{fake_loss} to help us calculate the
+discriminator losses in all of the following cases.
+
+\subsubsection{Discriminator training}
+
+\begin{enumerate}
+\item Compute the discriminator loss on real, training images
+\item Generate fake images
+\item Compute the discriminator loss on fake, generated images
+\item Add up real and fake loss
+\item Perform backpropagation + an optimization step to update the discriminator's weights
+\end{enumerate}
+
+\subsubsection{Generator training}
+
+\begin{enumerate}
+\item Generate fake images
+\item Compute the discriminator loss on fake images, using \textbf{flipped} labels!
+\item Perform backpropagation + an optimization step to update the generator's weights
+\end{enumerate}
+
+\paragraph{Saving Samples}
+
+As we train, we'll also print out some loss statistics and save some
+generated ``fake'' samples.
+
+\begin{lstlisting}[language=Python]
+from datetime import datetime
+import pickle as pkl
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# helper function for viewing a list of passed in sample images
+def view_samples(epoch, samples):
+    fig, axes = plt.subplots(figsize=(14,4), nrows=2, ncols=8, sharey=True, sharex=True)
+    for ax, img in zip(axes.flatten(), samples[epoch]):
+        img = img.detach()
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+        im = ax.imshow(img.reshape((28,28)), cmap='Greys_r')
+    plt.show()
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# training hyperparams
+num_epochs = 10
+
+# keep track of loss and generated, "fake" samples
+samples = []
+losses = []
+
+print_every = 100
+
+# Get some fixed data for sampling. These are images that are held
+# constant throughout training, and allow us to inspect the model's performance
+sample_size = 16
+fixed_z = np.random.uniform(-1, 1, size=(sample_size, z_size))
+fixed_z = torch.from_numpy(fixed_z).float()
+
+# train the network
+D.train()
+G.train()
+for epoch in range(num_epochs):
+    
+    for batch_i, (real_images, _) in enumerate(train_loader):
+                
+        batch_size = real_images.size(0)
+        
+        ## Important rescaling step ## 
+        real_images = real_images*2 - 1  # rescale input images from [0,1) to [-1, 1)
+        
+        # ============================================
+        #            TRAIN THE DISCRIMINATOR
+        # ============================================
+        d_optimizer.zero_grad()
+        
+        # 1. Train discriminator on real images & calculate loss
+        d_real_outputs = D(real_images)
+        d_real_loss = real_loss(d_real_outputs, smooth = True)
+        
+        # 2. Generate fake images
+        # gradients don't have to flow during this step
+        with torch.no_grad():
+            z = np.random.uniform(-1, 1, size=(batch_size, z_size))
+            z = torch.from_numpy(z).float()
+            fake_images = G(z)
+        
+        # 3. Compute the discriminator loss on fake, generated images
+        d_fake_outputs = D(fake_images)
+        d_fake_loss = fake_loss(d_fake_outputs)
+        
+        # 4. Add up real and fake loss
+        d_loss = d_real_loss + d_fake_loss
+        
+        # 5. Perform backpropagation + an optimization step to update the discriminator's weights
+        d_loss.backward()
+        d_optimizer.step()
+        
+        # =========================================
+        #            TRAIN THE GENERATOR
+        # =========================================
+        g_optimizer.zero_grad()
+        
+        # 1. Generate fake images
+        z = np.random.uniform(-1, 1, size=(batch_size, z_size))
+        z = torch.from_numpy(z).float()
+        fake_images = G(z)
+        
+        # 2. Compute the discriminator loss on fake images, using flipped labels!
+        g_outputs = D(fake_images)
+        g_loss = real_loss(g_outputs)
+        
+        # 3. Perform backpropagation + an optimization step to update the generator's weights
+        g_loss.backward()
+        g_optimizer.step()
+
+        # Print some loss stats
+        if batch_i % print_every == 0:
+            # print discriminator and generator loss
+            time = str(datetime.now()).split('.')[0]
+            print(f'{time} | Epoch [{epoch+1}/{num_epochs}] | Batch {batch_i}/{len(train_loader)} | d_loss: {d_loss.item():.4f} | g_loss: {g_loss.item():.4f}')
+    
+            ## AFTER EACH EPOCH##
+            # append discriminator loss and generator loss
+            losses.append((d_loss.item(), g_loss.item()))
+    
+    # generate and save sample, fake images
+    G.eval() # eval mode for generating samples
+    samples_z = G(fixed_z)
+    samples.append(samples_z)
+    view_samples(-1, samples)
+    G.train() # back to train mode
+
+
+# Save training generator samples
+with open('train_samples.pkl', 'wb') as f:
+    pkl.dump(samples, f)
+\end{lstlisting}
+
+\begin{lstlisting}
+2024-08-19 12:38:24 | Epoch [1/10] | Batch 0/469 | d_loss: 1.3956 | g_loss: 0.6160
+2024-08-19 12:40:30 | Epoch [1/10] | Batch 100/469 | d_loss: 1.0100 | g_loss: 0.8276
+2024-08-19 12:43:06 | Epoch [1/10] | Batch 200/469 | d_loss: 0.9428 | g_loss: 0.9320
+2024-08-19 12:45:22 | Epoch [1/10] | Batch 300/469 | d_loss: 0.7070 | g_loss: 1.3122
+2024-08-19 12:47:50 | Epoch [1/10] | Batch 400/469 | d_loss: 0.5602 | g_loss: 1.9145
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_24_1.png}
+
+\begin{lstlisting}
+2024-08-19 12:49:35 | Epoch [2/10] | Batch 0/469 | d_loss: 0.4550 | g_loss: 2.6934
+2024-08-19 12:51:56 | Epoch [2/10] | Batch 100/469 | d_loss: 0.4889 | g_loss: 2.1672
+2024-08-19 12:54:35 | Epoch [2/10] | Batch 200/469 | d_loss: 0.4199 | g_loss: 3.5037
+2024-08-19 12:56:44 | Epoch [2/10] | Batch 300/469 | d_loss: 0.3990 | g_loss: 4.0538
+2024-08-19 12:59:21 | Epoch [2/10] | Batch 400/469 | d_loss: 0.4340 | g_loss: 3.8504
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_24_3.png}
+
+\begin{lstlisting}
+2024-08-19 13:00:19 | Epoch [3/10] | Batch 0/469 | d_loss: 0.4214 | g_loss: 4.2729
+2024-08-19 13:01:17 | Epoch [3/10] | Batch 100/469 | d_loss: 0.4621 | g_loss: 5.0454
+2024-08-19 13:02:17 | Epoch [3/10] | Batch 200/469 | d_loss: 0.4464 | g_loss: 4.6674
+2024-08-19 13:03:14 | Epoch [3/10] | Batch 300/469 | d_loss: 0.5916 | g_loss: 4.5333
+2024-08-19 13:04:12 | Epoch [3/10] | Batch 400/469 | d_loss: 0.5599 | g_loss: 4.1011
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_24_5.png}
+
+\begin{lstlisting}
+2024-08-19 13:05:01 | Epoch [4/10] | Batch 0/469 | d_loss: 0.4423 | g_loss: 4.7987
+2024-08-19 13:06:00 | Epoch [4/10] | Batch 100/469 | d_loss: 0.4567 | g_loss: 5.3195
+2024-08-19 13:06:55 | Epoch [4/10] | Batch 200/469 | d_loss: 0.7699 | g_loss: 2.7604
+2024-08-19 13:07:54 | Epoch [4/10] | Batch 300/469 | d_loss: 0.6496 | g_loss: 3.0784
+2024-08-19 13:08:54 | Epoch [4/10] | Batch 400/469 | d_loss: 0.5625 | g_loss: 3.9456
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_24_7.png}
+
+\begin{lstlisting}
+2024-08-19 13:09:35 | Epoch [5/10] | Batch 0/469 | d_loss: 0.4736 | g_loss: 3.5710
+2024-08-19 13:10:40 | Epoch [5/10] | Batch 100/469 | d_loss: 0.4453 | g_loss: 4.0432
+2024-08-19 13:11:36 | Epoch [5/10] | Batch 200/469 | d_loss: 0.5239 | g_loss: 4.2559
+2024-08-19 13:12:36 | Epoch [5/10] | Batch 300/469 | d_loss: 0.5944 | g_loss: 3.4998
+2024-08-19 13:13:39 | Epoch [5/10] | Batch 400/469 | d_loss: 0.5396 | g_loss: 4.0217
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_24_9.png}
+
+\begin{lstlisting}
+2024-08-19 13:14:29 | Epoch [6/10] | Batch 0/469 | d_loss: 0.5029 | g_loss: 4.0910
+2024-08-19 13:15:36 | Epoch [6/10] | Batch 100/469 | d_loss: 0.5573 | g_loss: 5.5966
+2024-08-19 13:16:44 | Epoch [6/10] | Batch 200/469 | d_loss: 0.4193 | g_loss: 6.4893
+2024-08-19 13:17:52 | Epoch [6/10] | Batch 300/469 | d_loss: 0.4619 | g_loss: 5.3874
+2024-08-19 13:19:02 | Epoch [6/10] | Batch 400/469 | d_loss: 0.4260 | g_loss: 5.5646
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_24_11.png}
+
+\begin{lstlisting}
+2024-08-19 13:19:51 | Epoch [7/10] | Batch 0/469 | d_loss: 0.4431 | g_loss: 4.8300
+2024-08-19 13:21:15 | Epoch [7/10] | Batch 100/469 | d_loss: 0.4341 | g_loss: 4.8061
+2024-08-19 13:22:17 | Epoch [7/10] | Batch 200/469 | d_loss: 0.5104 | g_loss: 6.0527
+2024-08-19 13:23:16 | Epoch [7/10] | Batch 300/469 | d_loss: 0.5294 | g_loss: 5.6000
+2024-08-19 13:24:17 | Epoch [7/10] | Batch 400/469 | d_loss: 0.4048 | g_loss: 5.5299
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_24_13.png}
+
+\begin{lstlisting}
+2024-08-19 13:25:05 | Epoch [8/10] | Batch 0/469 | d_loss: 0.4675 | g_loss: 4.7217
+2024-08-19 13:26:11 | Epoch [8/10] | Batch 100/469 | d_loss: 0.4515 | g_loss: 4.9083
+2024-08-19 13:27:28 | Epoch [8/10] | Batch 200/469 | d_loss: 0.4682 | g_loss: 5.4478
+2024-08-19 13:28:49 | Epoch [8/10] | Batch 300/469 | d_loss: 0.4417 | g_loss: 6.2993
+2024-08-19 13:30:06 | Epoch [8/10] | Batch 400/469 | d_loss: 0.4591 | g_loss: 3.9562
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_24_15.png}
+
+\begin{lstlisting}
+2024-08-19 13:31:01 | Epoch [9/10] | Batch 0/469 | d_loss: 0.5769 | g_loss: 4.4656
+2024-08-19 13:32:14 | Epoch [9/10] | Batch 100/469 | d_loss: 0.5056 | g_loss: 4.3632
+2024-08-19 13:33:27 | Epoch [9/10] | Batch 200/469 | d_loss: 0.4482 | g_loss: 4.9012
+2024-08-19 13:34:40 | Epoch [9/10] | Batch 300/469 | d_loss: 0.5288 | g_loss: 5.1727
+2024-08-19 13:35:59 | Epoch [9/10] | Batch 400/469 | d_loss: 0.5007 | g_loss: 4.8494
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_24_17.png}
+
+\begin{lstlisting}
+2024-08-19 13:36:59 | Epoch [10/10] | Batch 0/469 | d_loss: 0.5755 | g_loss: 4.2650
+2024-08-19 13:38:15 | Epoch [10/10] | Batch 100/469 | d_loss: 0.6573 | g_loss: 3.2818
+2024-08-19 13:39:26 | Epoch [10/10] | Batch 200/469 | d_loss: 0.5454 | g_loss: 4.2313
+2024-08-19 13:40:26 | Epoch [10/10] | Batch 300/469 | d_loss: 0.6774 | g_loss: 4.5947
+2024-08-19 13:41:27 | Epoch [10/10] | Batch 400/469 | d_loss: 0.6092 | g_loss: 3.5220
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_24_19.png}
+
+\subsection{Training loss}
+
+Here we'll plot the training losses for the generator and discriminator,
+recorded after each epoch.
+
+\begin{lstlisting}[language=Python]
+fig, ax = plt.subplots()
+losses = np.array(losses)
+plt.plot(losses.T[0], label='Discriminator')
+plt.plot(losses.T[1], label='Generator')
+plt.title("Training Losses")
+plt.legend()
+\end{lstlisting}
+
+\begin{lstlisting}
+<matplotlib.legend.Legend at 0x799d977663d0>
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_26_1.png}
+
+\subsection{Generator samples from
+training}
+
+Here we can view samples of images from the generator. First we'll look
+at the images we saved during training.
+
+\begin{lstlisting}[language=Python]
+# Load samples from generator, taken while training
+with open('train_samples.pkl', 'rb') as f:
+    samples = pkl.load(f)
+\end{lstlisting}
+
+These are samples from the final training epoch. You can see the
+generator is able to reproduce numbers like 1, 7, 3, 2. Since this is
+just a sample, it isn't representative of the full range of images this
+generator can make.
+
+\begin{lstlisting}[language=Python]
+# -1 indicates final epoch's samples (the last in the list)
+view_samples(-1, samples)
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_30_0.png}
+
+Below I'm showing the generated images as the network was training,
+every 10 epochs.
+
+\begin{lstlisting}[language=Python]
+rows = 10 # split epochs into 10, so 100/10 = every 10 epochs
+cols = 6
+fig, axes = plt.subplots(figsize=(7,12), nrows=rows, ncols=cols, sharex=True, sharey=True)
+
+for sample, ax_row in zip(samples[::int(len(samples)/rows)], axes):
+    for img, ax in zip(sample[::int(len(sample)/cols)], ax_row):
+        img = img.detach()
+        ax.imshow(img.reshape((28,28)), cmap='Greys_r')
+        ax.xaxis.set_visible(False)
+        ax.yaxis.set_visible(False)
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_32_0.png}
+
+It starts out as all noise. Then it learns to make only the center white
+and the rest black. You can start to see some number like structures
+appear out of the noise like 1s and 9s.
+
+\subsection{Sampling from the generator}
+
+We can also get completely new images from the generator by using the
+checkpoint we saved after training. \textbf{We just need to pass in a
+new latent vector \(z\) and we'll get new samples}!
+
+\begin{lstlisting}[language=Python]
+# randomly generated, new latent vectors
+sample_size = 16
+rand_z = np.random.uniform(-1, 1, size=(sample_size, z_size))
+rand_z = torch.from_numpy(rand_z).float()
+
+G.eval() # eval mode
+# generated samples
+rand_images = G(rand_z)
+
+# 0 indicates the first set of samples in the passed in list
+# and we only have one batch of samples, here
+view_samples(0, [rand_images])
+\end{lstlisting}
+
+\includegraphics{img/genAdvNet/gan/output_35_0.png}

@@ -1,0 +1,578 @@
+\chapter{Modern GANs}
+
+\href{https://www.youtube.com/watch?v=3m-ZsIr1Wjs}{Youtube} \newline
+
+In this lesson, we will cover how the GAN architectural paradigm has been rethought over the last few years. We will cover topics such as the:
+
+\begin{itemize}
+    \item \textbf{Wasserstein GAN architecture}
+    \item \textbf{Gradients to improve GAN training stability}
+    \item \textbf{Growing architectures generators and discriminators}
+    \item \textbf{StyleGAN model}
+\end{itemize}
+I am very excited about this lesson as you will learn about architecture and techniques at the edge of GAN research!
+
+\includegraphics[width=0.75\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-05-12-at-12.06.29-pm.jpeg}
+\captionof{figure}{Schematic representation of GAN architecture}
+
+\section{Lesson Outline}
+\href{https://www.youtube.com/watch?v=z4ylfVBgHW8&t=3s}{Youtube} \newline
+
+In this lesson on \textbf{Modern GANs}, you will:
+
+\begin{itemize}
+    \item Use the Wasserstein Distance as a Loss Function for Training GANs
+    \item Leverage Gradient Penalties to Stabilize GAN Model Training
+    \item Build a ProGAN Model
+    \item Build Components of a StyleGAN Model
+\end{itemize}
+
+\section{Limitations of the BCE Loss}
+\href{https://www.youtube.com/watch?v=hlQQhQbRbTY&t=1s}{Youtube} \newline 
+The original \href{https://arxiv.org/pdf/1406.2661.pdf}{\textbf{GAN paper}} [1] already mentions some of the limitations of the BCE Loss, in the section 6 \textit{'Advantages and disadvantages'}.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-29-at-4.13.01-pm.jpeg}
+\captionof{figure}{The MiniMax game}
+
+This is the minimax game that you should be familiar with. \[E[\log (D(x))] + E[\log (1 - D(G(z)))]\]
+
+\begin{itemize}
+    \item We have \(x\), a sample from our real distribution, \(z\) the latent vector, our discriminator \(D\), and our generator \(G\).
+    \item The discriminator tries to maximize this expression, which means maximizing the log probability of \(x\) being real and maximizing the log of the inverse probability of \(G(z)\) being real.
+    \item The generator tries to minimize the log of the inverse probability of \(G(z)\) being real.
+    \item It is more stable for the generator to maximize the log probability of \(G(z)\) being fake.
+\end{itemize}
+
+\subsection{Challenges of Training GANs}
+The common problems with GANs are:
+\begin{itemize}
+    \item \textbf{Mode Collapse} occurs when the generator only creates some of the modes of the real distribution. The generator is not penalized for focusing on a single mode with BCE loss. E.g. in case of the MNIST dataset: it would only produce 1 or 2 different digits
+    \item \textbf{Vanishing Gradient} occurs when the discriminator loss reaches zero and the generator is not learning anymore.
+\end{itemize}
+
+\includegraphics[width=0.5\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-29-at-4.23.02-pm.jpeg}
+\captionof{figure}{Vanishing gradients in Generative Adversarial Networks (GANs)}
+
+
+\subsection{Addressing Vanishing Gradients}
+\textbf{Least squares} (LSGANs) can partly address the vanishing gradient problem for training deep GANs.
+The problem is as follows:
+\begin{itemize}
+    \item \textbf{For negative log-likelihood loss}, when an input x is quite big, the gradient can get close to zero and become meaningless for training purposes. However, with a squared loss term, the gradient will actually increase with a larger x, as shown below.
+\end{itemize}
+
+\includegraphics[width=0.75\linewidth]{img//genAdvNet//modernGAN/screen-shot-2018-11-10-at-7.38.03-pm.png}
+\captionof{figure}{Loss patterns for large x\textit{x} values. Image from the \href{https://arxiv.org/abs/1611.04076}{\textbf{LSGAN paper}} [2].}
+
+\textbf{Least square loss} is just one variant of a GAN loss. There are many more variants such as a \href{https://arxiv.org/abs/1701.07875}{\textbf{Wasserstein GAN loss}} [3] and others. \newline
+
+These loss variants sometimes can help stabilize training and produce better results. As you write your own code, you're encouraged to hypothesize, try out different loss functions, and see which works best in your case!
+\subsection{Citations}
+Following are the full citations for the papers referenced on this page:
+
+\begin{itemize}
+    \item \textbf{[1]} I. Goodfellow, J. Pouget-Abadie, M. Mirza, et al, "\textit{Generative Adversarial Nets}", Departement d’informatique et de recherche operationnelle Universite de Montreal [Online], Available: \href{https://arxiv.org/pdf/1406.2661.pdf}{\textbf{https://arxiv.org/pdf/1406.2661.pdf}}. [Accessed June 28, 2022].
+    \item \textbf{[2]} X. Mao, Q. Li, H. Xie, R. Y.K. Lau, et al, "\textit{Least Squares Generative Adversarial Networks}", Department of Computer Science, City University of Hong Kong, Department of Mathematics and Information Technology, The Education University of Hong Kong, et al [Online], Available: \href{https://arxiv.org/pdf/1611.04076.pdf}{\textbf{https://arxiv.org/pdf/1611.04076.pdf}}. [Accessed June 28, 2022].
+    \item \textbf{[3]} M. Arjovsky, S. Chintala, and L. Bottou, "\textit{Wasserstein GAN}", Courant Institute of Mathematical Sciences, Facebook AI Research [Online], Available: \href{https://arxiv.org/pdf/1701.07875.pdf}{\textbf{https://arxiv.org/pdf/1701.07875.pdf}}. [Accessed June 28, 2022].
+\end{itemize}
+
+\section{Wasserstein Loss}
+\href{https://www.youtube.com/watch?v=9LmWLMxNoF0}{Youtube} \newline
+
+To prevent mode collapse and vanishing gradient (does not have zero gradient when when the real and fake distributions are very different) there is another loss function to train GANs: 
+\begin{itemize}
+    \item \textbf{The Earth Mover Distance or Wasserstein Metric} also referred to as \textbf{Wasserstein Loss} and \textbf{Wasserstein Distance}
+\end{itemize}
+This metric measures the distance between two distribution. The name Earth Mover's Distance comes from the following analogy: if each one of our distribution is a pile of dirt, the earth mover distance is the cost of turning one pile into another. 
+
+\includegraphics[width=0.5\linewidth]{img//genAdvNet//modernGAN/eathMoversDistance.png}
+
+The Wasserstein Loss is mathematically represented as follows: \[E[C(x)] - E[C(G(z))]\]
+Similar to the BCE Loss, note that the logs have disappeared. Indeed the Wasserstein distance gets rid of the log function and only considers the probabilities.
+
+\includegraphics[width=0.5\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-29-at-4.29.11-pm.jpeg}
+\captionof{figure}{The discriminator is now a critic!}
+
+With the Wasserstein distance the discriminator is called \textbf{Critic}. \newline
+
+The \textbf{Critic}:
+\begin{itemize}
+    \item Does not discriminate between real and fake anymore but instead measures the distance between both distributions.
+    \item Will try to maximize this expression.
+    \item Wants to maximize the score of the real distribution and minimize the score of the fake distribution, which is similar to maximizing its inverse.
+\end{itemize}
+The generator will try to maximize the critic score of the fake distribution, which is similar to minimizing it with the flipped label.
+
+\includegraphics[width=0.75\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-29-at-4.33.14-pm.jpeg}
+\captionof{figure}{\textbf{The Gradient of the Wasserstein Distance in Never Zero}}
+
+The WGAN minimax game is described by the formula above. \newline
+
+When training the critic \(C\), we want to maximize the critic score on the real images x and minimize the critic score on the fake images \(G(z)\) which is similar to maximizing the inverse of \(C(G(z))\). \newline
+
+When training the generator \(G\), we want to maximize the score of the critic for the fake images.
+
+\subsubsection{1-Lipschitz continuous}
+
+The \textbf{1-Lipschitz continuous} is a new constraint on the discriminator or critic when using the Wasserstein distance as a loss function.\newline
+
+Defined mathematically: \newline
+
+For a function \(f\), the following condition must be fulfilled: \(|\frac{df(x)}{dx}| \le 1 \) \newline
+
+\textbf{Note:} For the rest of the class, Critic and Discriminator will be used interchangeably to designate the Discriminator network.
+
+\subsection{BCE Loss vs Wasserstein Loss}
+
+\begin{table}[!htbp]
+    \centering
+    \begin{tabular}{c|c}
+         Binary Cross Entropy & Wasserstein Distance\\
+         \hline
+         \(E[\log(D(x))] - E[\log(D(G(z)))]\)& \(E[C(x)] - E[C(G(z))])\)\\
+         Discriminate between 0 and 1 & Critic outputs any real number\\
+         Does not require any additional constraint & Requires 1-Lipschitz continuity on the critic\\
+    \end{tabular}
+\end{table}
+
+\subsection{Additional Resources}
+
+The \href{https://arxiv.org/pdf/1701.07875.pdf}{\textbf{Wasserstein GAN}} (WGAN) [1] paper is a little math-heavy but I recommend reading the paragraph on weight clipping on page 7 as well as the description of the WGAN algorithm on page 8.
+
+\subsection{Quiz Question}
+Which ones of the following are true about the BCE Loss?
+\begin{itemize}
+    \item \textbf{The output of the discriminator is bounded between 0 and 1}
+    \item Requires the discriminator to be 1-Lipschitz continuous
+    \item Can lead to vanishing gradients when the real and fake distributions are very similar.
+    \item \textbf{Can lead to mode collapse.}
+\end{itemize}
+
+\subsection{Citations}
+Following is the full citation for the paper referenced on this page:
+
+\textbf{[1]} M. Arjovsky, S. Chintala, and L. Bottou, "\textit{Wasserstein GAN}", Courant Institute of Mathematical Sciences, Facebook AI Research [Online], Available: \href{https://arxiv.org/pdf/1701.07875.pdf}{\textbf{https://arxiv.org/pdf/1701.07875.pdf}}. [Accessed June 28, 2022].
+
+\section{Gradient Penalties}
+\href{https://www.youtube.com/watch?v=NqEUeISsqs8&t=5s}{Youtube} 
+\subsection{Weight Clipping}
+In the \href{https://arxiv.org/pdf/1701.07875.pdf}{\textbf{WGAN paper}} [1], the authors explain that:
+
+\begin{quote}
+\textit{Weight clipping is a} \textit{\textbf{clearly terrible way}} \textit{to enforce a Lipschitz constraint. If the clipping parameter is large, then it can take a long time for any weights to reach their limit, thereby making it harder to train the critic till optimality. If the clipping is small, this can easily lead to vanishing gradients when the number of layers is big, or batch normalization is not used (such as in RNNs). We experimented with simple variants (such as projecting the weights to a sphere) with little difference, and} \textit{\textbf{we stuck with weight clipping due to its simplicity and already good performance.}} \textit{However, we do leave the topic of enforcing Lipschitz constraints in a neural network setting for further investigation, and we actively encourage interested researchers to improve on this method.}
+
+\end{quote}
+\subsection{WGAN Training Algorithm}
+To train the GAN:
+\begin{itemize}
+    \item Sample from the real data and generate some fake samples
+    \item Then calculate the Wasserstein Distance and the gradients at line 5.
+    \item Line 6, we perform backpropagation using RMSprop, an optimization algorithm similar to stochastic gradient descent or Adam
+    \item Enforce the weights to stay within a threshold of -0.01 and 0.01
+\end{itemize}
+\begin{lstlisting}
+# WGAN algorithm
+
+1 while GAN has not converged:
+2    # for each iteration
+3    Sample a batch of real data
+4    Sample a batch of fake data
+5    Calculate the gradient gw
+6    Backpropagation w = w + a RMSProp
+7    w = clip(w, -c, c)
+\end{lstlisting}
+In short, weight clipping works, but is not the best approach to enforce the Lipschitz constraint.
+\subsection{Gradient Penalties}
+The WGAN-GP paper introduced the concept of \textbf{gradient penalty}. In this paper, the authors add a new term to the new loss function that will penalize high gradients and help enforce the 1-Lipschitz constraint. Added to the Wasserstein Loss formula was the gradient penalty:  \[\lambda E[(||\nabla_{\hat{x}} C(\hat{x})||_2- 1)^2]\]
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-29-at-4.56.30-pm.jpeg}
+\captionof{figure}{Mathematical representation of gradient penalty}
+
+Calculating the gradient penalty also includes a bit of interpolation of the real and fake distribution:
+\begin{enumerate}
+    \item Randomly sample a coefficient \(\alpha\) of between \(0\) and \(1\)
+    \item Calculate the interpolation as: \(\hat{x} = \alpha x + (1 - \alpha) G(z)\)
+\end{enumerate}
+When \(\alpha\) is closer to \(0\) the interpolated sample is very noisy, and when \(\alpha\) is closer to \(1\) the interpolated sample is closer to the real distribution.
+\subsection{Enforcing 1-Lipschity Continuity}
+\begin{table}[!htbp]
+    \centering
+    \begin{tabular}{c|c}
+         Weight clipping & Gradient Penalty\\
+         \hline
+         \(w \leftarrow clip(w, -c, c)\) & \(\lambda E[(||\nabla_{\hat{x}} C(\hat{x})||_2- 1)^2]\)\\
+         Easy to implement, suboptimal way of enforcing the Lipschitz constraint & Requires calculating \(\hat{x}\), an interpolated ample of the real and fake distributions \(\alpha x + (1 - \alpha) G(z)\)\\
+    \end{tabular}
+
+\end{table}
+
+\subsection{Additional Resources}
+\begin{itemize}
+    \item For additional discussion regarding weight clipping in PyTorch, check out \href{https://discuss.pytorch.org/t/how-to-do-constrained-optimization-in-pytorch/60122}{\textbf{How to do constrained optimization in PyTorch}}.
+    \item A great GitHub repository,\href{https://github.com/LynnHo/DCGAN-LSGAN-WGAN-GP-DRAGAN-Pytorch}{\textbf{ DCGAN-LSGAN-WGAN-GP-DRAGAN-Pytorch}}, contains the implementation of various GANs with different gradient penalties. Reading the code is recommended as it will be helpful for the following exercises.
+\end{itemize}
+
+\subsection{Citations}
+Following is the full citation for the paper referenced on this page: 
+\begin{itemize}
+    \item \textbf{[1]} M. Arjovsky, S. Chintala, and L. Bottou, "\textit{Wasserstein GAN}", Courant Institute of Mathematical Sciences, Facebook AI Research [Online], Available: \href{https://arxiv.org/pdf/1701.07875.pdf}{\textbf{https://arxiv.org/pdf/1701.07875.pdf}}. [Accessed June 28, 2022].
+\end{itemize}
+
+\section{Exercise 1: Wasserstein Loss and Gradient penalty}
+\input{genAdvNet/Wasserstein_loss_gradient_penalty_Solution}
+
+\section{Exercise 1: Solution}
+\href{https://www.youtube.com/watch?v=XcwpaN_qMLE}{Youtube}
+
+\section{Progressive Growing of GANS}
+\href{https://www.youtube.com/watch?v=jnVQRG0ocjk}{Youtube} \newline
+
+To make training even more stable, the \textbf{ProGAN} model was developed and the current resolution is 16x16.
+\subsection{How ProGAN works}
+\begin{itemize}
+    \item It adds a new layer to the generator and a new layer to the discriminator by fading the layers in smoothly.
+    \item In the generator, the resolution of the 16x16 layer is doubled using an interpolation method such as nearest neighbor. The output of the 32x32 layer is then fused with this interpolated output.
+    \item In the discriminator, the output of the 32x32 layer is fused with a downsampled image.
+    \item A pooling method such as average pooling is used for downsampling.
+\end{itemize}
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-30-at-1.47.23-pm.jpeg}
+\captionof{figure}{ProGAN progressively adds layers at higher resolutions}
+
+In both cases, perform a weighted sum of the learned output of the new layer with the non-parametric output of the previous layer. \newline
+
+Slowly increase the weight of the output of the new layer over 10 epochs to reach a stage where there is no need to fade that layer anymore. \newline
+
+Then train the network at the 32x32 resolution for another 10 epochs.
+\subsection{Layer Fading}
+For more stable training, \textbf{layer fading} is a way to incorporate new layers. Consider the following example:
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-30-at-1.50.56-pm.jpeg}
+\captionof{figure}{Layer fading}
+
+
+\begin{enumerate}
+    \item Training a ProGAN model and the current resolution is 16x16. The toRGB layer maps the output of the last convolution to an RGB image and the from RGB layer takes a RGB image as input and feeds it into the next convolution layer.
+    \item To increase the resolution to 32x32 use \textbf{layer fading}. Add a new layer to the generator and the discriminator by doubling the resolution of the 16x16 layer using an \textbf{interpolation} method such as nearest neighbor.
+    \begin{itemize}
+        \item In the generator, fuse the output of the 32x32 layer with the interpolated output.
+        \item In the discriminator, fuse the output of the 32x32 layer with a downsampled image and use a pooling method such as average pooling for downsampling.
+    \end{itemize}
+    \item For both cases, perform a weighted sum of the learned output of the new layer with the non parametric output of the previous layer. Slowly increase the weight of the output of the new layer over 10 epochs to reach a stage where a fade is not needed in that layer.
+    \item Train the network at the 32x32 resolution for another 10 epochs
+\end{enumerate}
+
+\subsection{ProGAN Tricks}
+
+\begin{itemize}
+    \item \textbf{Progressive Growing} – Progressively train layers and increase resolution
+    \item \textbf{Minibatch Discrimination} – Enforce fake and real batches to have similar statistics
+    \item \textbf{Equalized Learning Rates} – Scale the weights of each layer by a different constant to make sure the layers are learning at the same speed
+    \item \textbf{Pixelwise Normalization} – Normalize each pixel of a feature map along the channel axis
+\end{itemize}
+
+\subsection{Additional Resources}
+
+The ProGAN paper, \href{https://arxiv.org/pdf/1710.10196.pdf}{\textbf{Progressive Growing GANs for Improved Quality, Stability, and Variation}} [1], is very accessible and I recommend reading it to better understand the different components of ProGAN.
+
+Other resources for implementing ProGAN include the following links:
+
+\begin{itemize}
+    \item \href{https://github.com/tkarras/progressive_growing_of_gans}{\textbf{Official ProGAN implementation in TensorFlow}}
+    \item \href{https://github.com/akanimax/pro_gan_pytorch}{\textbf{\textbf{ProGAN implementation in PyTorch (unofficial)}
+}}
+\end{itemize}
+\subsection{Quiz Question}
+You are starting to train a ProGAN model. Put the following steps in the right order!
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//modernGAN/quizPGAN.png}
+
+\subsection{Citations}
+
+Following is the full citation for the paper referenced on this page: \newline
+
+\textbf{[1]} I. T. Karras, T. Aila, S. Laine, J. Lehtinen, "\textit{Progressive Growing GANs for Improved Quality, Stability, and Variation}", NVIDIA, Aalto University [Online], Available: \href{https://arxiv.org/pdf/1710.10196.pdf}{\textbf{https://arxiv.org/pdf/1710.10196.pdf}}. [Accessed June 28, 2022].
+
+\section{ProGAN components}
+In addition to the progressive growing of networks, the \href{https://arxiv.org/pdf/1710.10196.pdf}{\textbf{ProGAN paper}} [1] has a couple of additional novel ideas: \textbf{pixelwise normalization} and \textbf{minibatch standard deviation}.
+
+\subsection{Pixelwise normalization}
+
+You are familiar with batch normalization and you may be familiar with other type of normalization, as described in the figure below.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//modernGAN/screenshot-from-2022-05-04-09-22-26.jpeg}
+\captionof{figure}{From the paper, \href{https://arxiv.org/pdf/1803.08494.pdf}{\textbf{Group Normalization}}, by Yuxin Wu, et al [2]}
+
+C is the channel dimensions, N the batch dimension and H, W the spatial dimensions. For example, for a batch normalization layer, we calculate mean and variance over the batch and spatial dimensions, so we have a pair of (mean, variance) values for each channel. \newline
+
+With pixel normalization, we normalize each pixel of the input volume as follow:
+\begin{lstlisting}
+y = x.pow(2.0).mean(dim=1, keepdim=True).add(alpha).sqrt() 
+x = x / y
+\end{lstlisting}
+where \lstinline|x| is the input volume of dimensions (NCHW). We square the input volume, calculate the mean over the channel dimension, add a very small factor alpha and calculate the square root.
+
+\subsection{Minibatch Standard Deviation}
+The paper, \href{https://arxiv.org/pdf/1606.03498.pdf}{\textbf{Improved Techniques for Training GANs}} [3], introduced the concept of \textbf{minibatch discrimination}, to enforce similarities between batches of real and fake images. \newline
+
+In the ProGAN paper, the authors simplify this idea by introducing \textbf{minibatch standard deviation}. They create a new layer that adds a feature map to the input. This layer does the following:
+\begin{itemize}
+    \item calculate the standard deviation for each feature and spatials locations
+    \item replicate the value and concatenate it over all spatial locations
+\end{itemize}
+
+\begin{lstlisting}
+    def minibatch_stddev_layer(x, group_size=4):
+    with tf.variable_scope('MinibatchStddev'):
+        group_size = tf.minimum(group_size, tf.shape(x)[0])     # Minibatch must be divisible by (or smaller than) group_size.
+        s = x.shape                                             # [NCHW]  Input shape.
+        y = tf.reshape(x, [group_size, -1, s[1], s[2], s[3]])   # [GMCHW] Split minibatch into M groups of size G.
+        y = tf.cast(y, tf.float32)                              # [GMCHW] Cast to FP32.
+        y -= tf.reduce_mean(y, axis=0, keepdims=True)           # [GMCHW] Subtract mean over group.
+        y = tf.reduce_mean(tf.square(y), axis=0)                # [MCHW]  Calc variance over group.
+        y = tf.sqrt(y + 1e-8)                                   # [MCHW]  Calc stddev over group.
+        y = tf.reduce_mean(y, axis=[1,2,3], keepdims=True)      # [M111]  Take average over fmaps and pixels.
+        y = tf.cast(y, x.dtype)                                 # [M111]  Cast back to original data type.
+        y = tf.tile(y, [group_size, 1, s[2], s[3]])             # [N1HW]  Replicate over group and pixels.
+        return tf.concat([x, y], axis=1)     
+\end{lstlisting}
+The code above is taken from the \href{https://github.com/tkarras/progressive_growing_of_gans/blob/master/networks.py\#L127}{\textbf{original implementation in TensorFlow}} but the PyTorch version is very similar. \newline
+
+Note how the authors are calculating the standard deviation per group of 4 pixels here.\newline
+
+This new layer is added only in the discriminator obviously and towards the end of the network.
+
+\subsection{Citations}
+Following are the full citations for the papers referenced on this page:
+\begin{itemize}
+    \item \textbf{[1]} I. T. Karras, T. Aila, S. Laine, J. Lehtinen, "\textit{Progressive Growing GANs for Improved Quality, Stability, and Variation}", NVIDIA, Aalto University [Online], Available: \href{https://arxiv.org/pdf/1710.10196.pdf}{\textbf{https://arxiv.org/pdf/1710.10196.pdf}}. [Accessed June 28, 2022].
+    \item \textbf{[2]} Y. Wu, K. He, "\textit{Group Normalization}", Facebook AI Research (FAIR) [Online], Available: \href{https://arxiv.org/pdf/1803.08494.pdf}{\textbf{https://arxiv.org/pdf/1803.08494.pdf}}. [Accessed June 28, 2022].
+    \item \textbf{[3]} T. Salimans, I. Goodfellow, W. Zaremba, et al, "\textit{Improved Techniques for Training GANs}", OpenAI [Online], Available: \href{https://arxiv.org/pdf/1606.03498.pdf}{\textbf{https://arxiv.org/pdf/1606.03498.pdf}}. [Accessed June 28, 2022].
+\end{itemize}
+
+\include{genAdvNet/ProGAN_Solution}
+
+\section{Exercise 2: Solution}
+\href{https://www.youtube.com/watch?v=-BK4Y_PIAag}{Youtube}
+
+\section{StyleGAN: Introduction}
+\href{https://www.youtube.com/watch?v=OI3t0u5DINc&t=2s}{Youtube} \newline
+
+Deep learning is a somewhat recent field and many consider the 2012 AlexNet paper as the starting point of the deep learning revolution. The progress in creating realistic generated images is most exemplified by the StyleGAN paper in 2019 as it was the first architecture to produce very high-quality samples.
+
+\includegraphics[width=0.25\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-30-at-4.12.15-pm.jpeg}
+\captionof{figure}{Traditional generator}
+
+
+\subsection{The Traditional Generator}
+For a traditional generator:
+
+\begin{enumerate}
+    \item We input a latent vector z.
+    \item Run it through a bunch of fully connected, convolution and normalization layers.
+    \item Get a generated RGB image.
+\end{enumerate}
+
+\subsection{The StyleGAN Generator}
+For the StyleGAN generator :
+
+\begin{enumerate}
+    \item There is a new network, only made of fully connected layer, \textbf{the mapping network,} and it is taking the latent vector and outputs a new latent vector w.
+    \item Add noise at multiple places in the network, always after the convolution layers.
+    \item StyleGAN uses a new type of normalization layer, the \textbf{adaptive instance normalization layer}, or \textbf{AdaIn}.
+\end{enumerate}
+Next, we will dissect each one of these new components and understand how they were leveraged to create such high quality images.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-30-at-4.13.35-pm.jpeg}
+\captionof{figure}{StyleGAN architecture}
+
+
+\subsection{Additional Resources}
+The StyleGAN paper, \href{https://arxiv.org/pdf/1812.04948.pdf}{\textbf{A Style-Based Generator Architecture for Generative Adversarial Networks}} [1], is worth reading to explore the full details of the architecture. The images shown here are from the StyleGAN paper referenced.
+
+\subsection{Citations}
+Following is the full citation for the paper referenced on this page: \newline
+
+\textbf{[1]} T. Karras, S. Laine, T. Aila, "\textit{A Style-Based Generator Architecture for Generative Adversarial Networks}", NVIDIA [Online], Available: \href{https://arxiv.org/pdf/1812.04948.pdf}{\textbf{https://arxiv.org/pdf/1812.04948.pdf}} . [Accessed June 28, 2022].
+
+\section{StyleGAN Components 1}
+\href{https://www.youtube.com/watch?v=FgWMN-FMdjU}{Youtube}
+
+\subsection{Controllable Generation}
+\textbf{Conditional Generation} indicates that the training set must be labeled and conditioning is limited to examples from the training set. \newline
+
+\textbf{Conditional Generation} – each image is conditioned with a label (e.g. MNIST dataset).
+For example, fake 11s can not be generated with a conditional GAN trained on the MNIST dataset because the data set only includes digits in the range of 0 to 9. \newline
+
+\href{https://arxiv.org/pdf/1411.1784.pdf}{\textbf{Conditional Generative Adversarial Nets}} [1] introduced the \textbf{conditional GAN}. An example of conditional implementation in PyTorch can be viewed in the \href{https://github.com/eriklindernoren/PyTorch-GAN/blob/36d3c77e5ff20ebe0aeefd322326a134a279b93e/implementations/cgan/cgan.py}{\textbf{PyTorch-GAN CGAN implementation on GitHub}}. Conditional GANs have an extra input from the discriminator and generator networks. \newline
+
+For \textbf{controllable generation,} instead of inputting a label to condition the output, the latent vector z is modified to control the aspect of the output. This makes the assumption that the components of z each control a different aspect of the output image. 
+
+\begin{itemize}
+    \item \textbf{Controllable Generation} – does not require labels.
+\end{itemize}
+
+\subsection{The Mapping Network}
+The \textbf{mapping network} is a new component of the StyleGAN generator. A mapping network:
+
+\begin{itemize}
+    \item Takes the latent vector z as input
+    \item Outputs a new latent vector w
+    \item Helps to disentangle the latent vector z for controllable generation = decorrelate the different features
+\end{itemize}
+
+\includegraphics[width=0.25\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-30-at-4.46.39-pm.jpeg}
+\captionof{figure}{StyleGAN: mapping network}
+
+\subsection{The Entanglement Problem}
+When modifying some components, we impact more than one feature. Some features are correlated or entangled. This is the \textbf{entanglement problem}. \newline
+
+For example in trying to generate faces, features could include:
+\begin{itemize}
+    \item Haircut
+    \item Eye color
+    \item Glasses
+    \item Age
+\end{itemize}
+
+\includegraphics[width=0.5\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-30-at-4.46.56-pm.jpeg}
+\captionof{figure}{The entanglement problem}
+
+If the features are entangled, putting glasses on a person could also make them older. \newline
+
+Mapping network to the rescue! By mapping the vector z to another vector w, the generator gets the capacity to disentangle features.
+\subsection{Noise Injection}
+Another new component of StyleGAN is the injection of noise at different locations in the generator. This \textbf{noise injection} will:
+
+\begin{itemize}
+    \item Help with \textbf{stochastic variation}, e.g. the position of freckles on a face. Injecting noise in the network will help create more diverse features.
+    \item Happen at different locations in the network and impacts the variability of the images at different levels.
+\end{itemize}
+A \textbf{learned scaling factor} is applied to the noise input before being added to the output of a given layer. \newline
+
+To add noise:
+\begin{enumerate}
+    \item A random feature map is sampled from a gaussian distribution
+    \item The map is multiplied by a learned scaling factor
+    \item This noise is applied to the output of the convolutional layers
+\end{enumerate}
+
+\includegraphics[width=0.5\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-30-at-4.47.08-pm.jpeg}
+\captionof{figure}{Noise injection}
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//modernGAN/noiseVSnoNoise.png}
+\captionof{figure}{Comparison between noise vs no noise}
+
+\subsection{Citations}
+Following are the full citations for the papers referenced on this page: \newline
+
+\textbf{[1]} M. Mirza, S, Osindero, "\textit{Conditional Generative Adversarial Nets}", Departement d’informatique et de recherche operationnelle Universite de Montreal, Flickr / Yahoo Inc. [Online], Available: \href{https://arxiv.org/pdf/1411.1784.pdf}{\textbf{https://arxiv.org/pdf/1411.1784.pdf}}. [Accessed June 28, 2022].
+
+\section{SyleGAN Components 2}
+\href{https://www.youtube.com/watch?v=Cs467j73Ml0&t=3s}{Youtube} \newline
+
+All \textbf{Normalization Layers} calculate the mean and the variance of a certain subset and normalize the input. \newline
+
+Remember, for \textbf{Batch Normalization}, we:
+
+\begin{enumerate}
+    \item Calculate the mean and variance of the batch and spatial dimensions
+    \item For each channel of the inputs, there are different values of means and variance
+\end{enumerate}
+
+\subsection{Instance Normalization Layer}
+The \textbf{Instance Normalization Layer} – only normalizes over the spatial dimensions and each input has a number of channels times the batch size values of means and variance.
+
+\includegraphics[width=0.5\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-30-at-6.23.29-pm.jpeg}
+\captionof{figure}{Image adapted from: \href{https://arxiv.org/pdf/1803.08494v3.pdf}{\textbf{https://arxiv.org/pdf/1803.08494v3.pdf}}}
+
+\subsection{Adaptive Instance Normalization Layer}
+The \textbf{Adaptive Instance Normalization Layer (Adaln):}
+
+\begin{enumerate}
+    \item Takes the latent vector, \(w\), as input and using a fully connected layer, projects that vector into two vectors of style, \(y_s\) and \(y_b\).
+    \item The output of the previous layer goes through an Instance Normalization Layer.
+    \item Use the styles \(y_s\) and \(y_b\) to scale and bias the output of the Instance Normalization Layer.
+    \item Allows one to project the latent vector \(w\) into the styles and inject the styles into the generator.
+\end{enumerate}
+\textbf{Style Mixing} injects a different vector \(w\) at different places in the network and provides a regularization effect. This prevents the network from assuming that adjacent styles are correlated.
+
+\includegraphics[width=0.5\linewidth]{img//genAdvNet//modernGAN/screen-shot-2022-06-30-at-6.26.28-pm.jpeg}
+\captionof{figure}{Adaptive Instance Normalization (AdaIn) layer}
+
+
+\subsection{Style Transfer}
+In practice, Adaln layers allow for the creation of a new image (c) by taking a first image (a) and modifying it in the style of a second image (b). A popular example is taking the image of the Mona Lisa (a) and the style of a Picasso painting (b) and creating a new Mona Lisa in Picasso style image (c). This image can be seen \href{https://www.deviantart.com/dr-koesters/art/Neural-Style-Transfer-Mona-Lisa-by-Picasso-733533838}{\textbf{here}} and this process is known as \textbf{style transfer}. \newline
+
+The initial process of style transfer was time consuming; however, check out the paper, \href{https://arxiv.org/pdf/1703.06868.pdf}{\textbf{\textit{Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization}}}, which details a use case for how Adaln layers may be implemented to create fast style transfers based on arbitrary styles.
+
+\subsection{Entanglement}
+In your own words, explain the problem of feature entanglement and how StyleGAN tries to solve it. \newline
+
+Things to think about: The StyleGAN paper (section 4) goes into depth about disentanglement. Definitely a recommended read!
+
+\subsection{Quiz Question}
+Match each element of the StyleGAN model with its purpose
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//modernGAN/quiz_styleGAN.png}
+
+\subsection{Citations}
+Following are the full citations for the papers referenced on this page: \newline
+
+\textbf{[1]} X. Huang, S. Belongie, "\textit{Arbitrary Style Transfer in Real-time with Adaptive Instance Normalization}", Department of Computer Science \& Cornell Tech, Cornell University [Online], Available: \href{https://arxiv.org/pdf/1703.06868.pdf}{\textbf{https://arxiv.org/pdf/1703.06868.pdf}}. [Accessed June 30, 2022].
+\include{genAdvNet/StyleGan_Solution}
+\section{Exercise 3: Solution}
+\href{https://www.youtube.com/watch?v=6E98tNss7Y8}{Youtube}
+
+\section{When to Use Modern GAN Techniques}
+Youtube \newline
+
+Starting with a simpler architecture is always an easy and fast way to get started on a new problem.
+\begin{itemize}
+    \item \textbf{DCGAN} is great starting point
+    \item \textbf{ProGAN} or \textbf{StyleGAN} are practical when training on high resolution images
+    \item \textbf{Wasserstein Loss} and \textbf{Gradient Penalties} experimentation is recommended when mode collapse or vanishing gradient are observed
+\end{itemize}
+
+\subsection{Additional Resources}
+One of my favorite blog posts ever: \href{http://karpathy.github.io/2019/04/25/recipe/}{\textbf{A recipe for training neural networks(opens in a new tab)}}. A great read and most concepts are applicable to GANs.
+
+\section{Lesson Review}
+\href{https://www.youtube.com/watch?v=sX7084PStFk}{Youtube} \newline
+
+We have completed this lesson on implementing \textbf{Modern GAN} modeling techniques and you have accomplished a lot. \newline
+
+Over the course of this lesson you:
+\begin{itemize}
+    \item Used the Wasserstein Distance as a Loss Function for Training GANs
+    \item Leveraged Gradient Penalties to Stabilize GAN Model Training
+    \item Built a ProGAN Model
+    \item Built Components of a StyleGAN Model
+\end{itemize}
+\textbf{Congratulations, work well done!}
+
+\subsection{Citations}
+Following are the full citations for the papers referenced on this page:
+
+\begin{itemize}
+    \item I. Goodfellow, J. Pouget-Abadie, M. Mirza, et al, "\textit{\textbf{Generative Adversarial Nets}}", Departement d’informatique et de recherche operationnelle Universite de Montreal [Online], Available: \href{https://arxiv.org/pdf/1406.2661.pdf}{\textbf{https://arxiv.org/pdf/1406.2661.pdf(opens in a new tab)}}. [Accessed June 28, 2022].
+    \item X. Mao, Q. Li, H. Xie, R. Y.K. Lau, et al, "\textit{\textbf{Least Squares Generative Adversarial Networks}}", Department of Computer Science, City University of Hong Kong, Department of Mathematics and Information Technology, The Education University of Hong Kong, et al [Online], Available: \href{https://arxiv.org/pdf/1611.04076.pdf}{\textbf{https://arxiv.org/pdf/1611.04076.pdf(opens in a new tab)}}. [Accessed June 28, 2022].
+    \item M. Arjovsky, S. Chintala, and L. Bottou, "\textit{\textbf{Wasserstein GAN}}", Courant Institute of Mathematical Sciences, Facebook AI Research [Online], Available: \href{https://arxiv.org/pdf/1701.07875.pdf}{\textbf{https://arxiv.org/pdf/1701.07875.pdf(opens in a new tab)}}. [Accessed June 28, 2022].
+    \item I. T. Karras, T. Aila, S. Laine, J. Lehtinen, "\textit{\textbf{Progressive Growing GANs for Improved Quality, Stability, and Variation}}", NVIDIA, Aalto University [Online], Available: \href{https://arxiv.org/pdf/1710.10196.pdf}{\textbf{https://arxiv.org/pdf/1710.10196.pdf(opens in a new tab)}}. [Accessed June 28, 2022]
+    \item Y. Wu, K. He, "\textit{\textbf{Group Normalization}}", Facebook AI Research (FAIR) [Online], Available: \href{https://arxiv.org/pdf/1803.08494.pdf}{\textbf{https://arxiv.org/pdf/1803.08494.pdf(opens in a new tab)}}. [Accessed June 28, 2022].
+    \item T. Salimans, I. Goodfellow, W. Zaremba, et al, "\textit{\textbf{Improved Techniques for Training GANs}}", OpenAI [Online], Available: \href{https://arxiv.org/pdf/1606.03498.pdf}{\textbf{https://arxiv.org/pdf/1606.03498.pdf(opens in a new tab)}}. [Accessed June 28, 2022].
+\end{itemize}
+
+\section{Course Summary}
+\href{https://www.youtube.com/watch?v=1R5JD_I3m0w}{Youtube} \newline
+
+\subsection{Congratulations}
+You have completed this course. We covered a number of topics and you implemented a broad variety of techniques, including:
+
+\begin{itemize}
+    \item Building and training a simple GAN model on the MNIST dataset
+    \item Building a more complex DCGAN and implementing GAN evaluation metrics
+    \item Using dataloaders and implementing functions to train a CycleGAN model
+    \item Implementing gradient penalties to execute ProGAN and StyleGAN models
+\end{itemize}
+Congratulations again and we can't wait to see what innovative computer-generated images you create.

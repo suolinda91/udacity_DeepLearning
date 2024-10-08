@@ -1,0 +1,302 @@
+\chapter{Generative Adversarial Networks}
+
+\section{Welcome to GANs}
+\href{https://www.youtube.com/watch?v=-h2D0ZWmCM8}{Youtube} \newline
+
+Welcome to this lesson on \textbf{Generative Adversarial Networks} taught by the "Godfather" of GANs, Ian Goodfellow. \newline
+
+By the end of this lesson, you will be able to:
+
+\begin{itemize}
+    \item \textbf{Build a generator and a discriminator network}
+    \item \textbf{Implement the generator and discriminator loss functions.}
+    \item \textbf{Train a GAN on a dataset}
+    \item \textbf{Implement some tips and tricks to increase the stability of GAN training}
+\end{itemize}
+After this lesson, you will have a good understanding of generative adversarial networks and the challenges of successfully training them!
+
+\textbf{Let's get started!}
+
+\includegraphics[width=1\linewidth]{img//genAdvNet/screen-shot-2022-05-10-at-9.24.21-am.jpeg}
+\captionof{figure}{Schematic representation of GAN architecture}
+
+
+\section{Lesson Outline}
+\href{https://www.youtube.com/watch?v=vu3JV-Va-PM}{Youtube} \newline
+
+In this lesson on \textbf{Generative Adversarial Networks} we will cover the following topics:
+
+\begin{itemize}
+    \item Building Generator and Discriminator Networks
+    \item Implementing Loss Functions
+    \item Training a GAN on a dataset
+    \item Implementing techniques to improve GAN training
+\end{itemize}
+
+\section{Introducing Ian Goodfellow}
+\href{https://www.youtube.com/watch?v=r6tq6-L8Qk0}{Youtube} \newline
+
+Ian Goodfellow is the creator of GANs and has held many roles including:
+
+\begin{itemize}
+    \item Senior Research Scientist at Google
+    \item Director of Machine Learning at Apple
+\end{itemize}
+In this lesson, Ian will teach you how to create new \textbf{computer-generated images} that can appear very realistic.
+
+You will find that GANs has real-world application in a number of broad fields including:
+
+\begin{itemize}
+    \item \textbf{Computer Vision}
+    \item \textbf{The Automotive Industry}
+    \item \textbf{Video Gaming}
+\end{itemize}
+and its implications can be far-reaching.
+
+\section{Applications of GANs}
+\href{https://www.youtube.com/watch?v=dW2puRa-yqo}{Youtube} \newline
+
+GANs can be used for a number of broad applications. \newline
+
+\textbf{Visual, Image-Based Applications}
+
+\begin{itemize}
+    \item Creating new images
+    \item Digital Art
+    \item Image to Image Translation
+    \item Realistic image training sets
+    \item Imitation Learning
+\end{itemize}
+\textbf{Less Visual Applications}
+\begin{itemize}
+    \item Predicting the outcome of highly complex physics experiments
+    \item Generating adversarial examples
+\end{itemize}
+
+\subsubsection{Quiz Question}
+
+What can Generative Adversarial Networks be used for?
+\begin{itemize}
+    \item \textbf{Generate a new image of a cat}
+    \item \textbf{Turn an image of a zebra into a horse}
+    \item Image classification
+\end{itemize}
+
+\subsection{Additional Resources}
+
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/1612.03242}{\textbf{StackGAN: Text to Photo-realistic Image Synthesis with Stacked Generative Adversarial Networks (ArXiv)}}, is an academic paper about using computer vision and pattern recognition to create realistic images.
+    \item \href{https://github.com/junyanz/iGAN}{\textbf{iGAN: Interactive Image Generation via Generative Adversarial Networks (GitHub)}}, uses a GANs model to create interactive image generation based on real-time user inputs.
+    \item \href{https://video.udacity-data.com/topher/2018/November/5bea23cd_cartoongan/cartoongan.pdf}{\textbf{CartoonGAN: Generative Adversarial Networks for Photo Cartoonization (PDF)}}, is a paper about transforming real-life photos into cartoon-style images.
+\end{itemize}
+
+\section{How GANs Work}
+\href{https://www.youtube.com/watch?v=--LJlzpsrmA}{Youtube} \newline
+
+\subsection{Image Generation}
+
+\begin{itemize}
+    \item \textbf{Fully Visible Belief Networks} – where the model generates an image one pixel at a time. This is also called an \textbf{Autoregressive Model}.
+    \item \textbf{Generative Adversarial Networks (GANs)} – where the model generates an entire image in parallel using a differentiable function
+\end{itemize}
+
+\subsection{How to Get Realistic Images}
+GANs used a combination of neural networks to accomplish the task of image generation:
+
+\begin{itemize}
+    \item \textbf{Generator Network –} takes random input through a differentiable function to transform and reshape it to have a recognizable structure. The output is a realistic image.
+\end{itemize}
+
+\includegraphics[width=0.5\linewidth]{img//genAdvNet/screen-shot-2022-06-30-at-7.04.47-pm.jpeg}
+\captionof{figure}{Generators create new images based on a dataset}
+
+Unlike training a supervised learning model, when training a generator model, there is no classification/label to associate with each image. It creates additional images based on a probability distribution.
+
+\begin{itemize}
+    \item \textbf{Discriminator Network –} is a regular neural net classifier that learns to guide the generator network by outputting the probability that the input is real. Fake images are 0 and real images are 1.
+\end{itemize}
+
+The generator network is forced to produce more realistic images to "fool" the discriminator network.
+
+\includegraphics[width=0.5\linewidth]{img//genAdvNet/screen-shot-2022-06-30-at-7.07.48-pm.jpeg}
+\captionof{figure}{Discriminators determine the probability of an image being "real" or "fake"}
+
+\subsubsection{Additional Resources}
+Here's the same sentence with a descriptive link text for the hyperlink: \newline
+
+Check out Ian's original paper on \href{https://arxiv.org/pdf/1406.2661.pdf}{\textbf{Generative Adversarial Nets (ArXiv PDF)}}[1].
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//gan/image.png}
+
+Good job! Training a GAN is like watching a competition between two networks, the discriminator and the generator. The generator tries to fool the discriminator by creating realistic images and the discriminator tries to identify which money is fake and which one is real.
+
+\subsection{Citations}
+Following is the full citation for the paper referenced on this page:
+
+\begin{itemize}
+    \item \textbf{[1]} I. Goodfellow, J. Pouget-Abadie, M. Mirza, et al, "\textit{Generative Adversarial Nets}", Departement d’informatique et de recherche operationnelle Universite de Montreal [Online], Available: \href{https://arxiv.org/pdf/1406.2661.pdf}{\textbf{https://arxiv.org/pdf/1406.2661.pdf}}. [Accessed June 28, 2022].
+\end{itemize}
+
+\input{genAdvNet/MNIST_GAN}
+\section{Exercise Part 1: Solution}
+\href{https://www.youtube.com/watch?v=Wat3QCqs6Is}{Youtube}
+
+\section{Games and Equilibria}
+\href{https://www.youtube.com/watch?v=Vpzm8r8C2CY}{Youtube}
+
+\subsection{Adversarial}
+
+In GANs, \textbf{adversarial} means that two networks, the generator and the discriminator, compete with each other for improved image generation. \newline
+
+This "competition" between the networks is based on \textbf{Game Theory}. \newline
+
+\textbf{Game Theory –} a form of applied mathematics used to model cooperation and conflict between rational agents in any situation \newline
+
+\href{https://www.youtube.com/watch?v=O0J6kzhjf4M}{Youtube}
+\subsection{Equilibria and GANs}
+
+Most ML models are based on optimization and follow the general pattern of
+
+\begin{enumerate}
+    \item Determine model parameters
+    \item Have a cost function of these parameters
+    \item Minimize the cost
+\end{enumerate}
+GANs are different because there are two players, the generator and the discriminator, and each player has its own cost. The "game" is therefore defined by a value function.
+
+\begin{itemize}
+    \item The \textbf{generator wants to minimize} the value function.
+    \item The \textbf{discriminator wants to maximize} the value function.
+    \item The \textbf{saddle point} is when equilibrium is reached, a point in the parameters of both players that is simultaneously a local minimum for each player's costs with respect to that player's parameters.
+\end{itemize}
+A key learning problem for GANs is finding the equilibrium of a game involving cost functions that are:
+
+\begin{itemize}
+    \item High dimensional
+    \item Continuous
+    \item Non-convex
+\end{itemize}
+
+\subsubsection{Quiz Question}
+Which of the following statements are true?
+\begin{itemize}
+    \item \textbf{Training a GAN is equivalent to playing a game where both networks are competing with each other.}
+    \item When training a GAN, after some time, the equilibrium is always reached.
+    \item Game Theory is a subfield of deep learning invented to describe GANs training.
+    \item The GAN equilibrium is reached when the discriminator loss reaches 0
+\end{itemize}
+
+
+\subsection{Additional Reading}
+
+A very famous example of Game Theory is the Prisoner Dilemma. This \href{https://www.youtube.com/watch?v=t9Lo2fgxWHw}{\textbf{explanatory video on the Prisoner's Dilemma}} explains this game very well. A few others concepts are keys to understand game theory:
+
+\begin{itemize}
+    \item \href{https://en.wikipedia.org/wiki/Nash_equilibrium}{\textbf{Nash equilibrium}}: an equilibrium reached when neither player gain anything by changing their strategies. In the Prisoner Dilemma's game, the Nash Equilibrium is attained when both players decide to betray each other
+    \item \href{https://en.wikipedia.org/wiki/Pareto_efficiency}{\textbf{Pareto optimality}}: a strategy is Pareto optimal when neither player can be better off without another player being negatively affected. In the Prisoner Dilemma's game, both players deciding to not betray each other is Pareto optimal.
+\end{itemize}
+
+\section{Tips for Training GANs}
+\href{https://www.youtube.com/watch?v=JXfgLuCLFM8}{Youtube}
+
+\subsection{Good Architecture}
+
+\textbf{Fully Connected Architecture} can be used for simple tasks that meet the following criteria:
+
+\begin{enumerate}
+    \item No convolution
+    \item No recurrence
+    \item The generator and discriminator have a least one hidden layer
+\end{enumerate}
+\textbf{Leaky ReLU} helps to make sure that the gradient can flow through the entire architecture and is a popular choice for hidden layer activation functions. \newline
+
+The \textbf{Hyperbolic Tangent} activation function is a popular output choice for the generator and means data should be scaled to the interval from -1 to +1. \newline
+
+A \textbf{Sigmoid Unit} is used to enforce the constraint that the output of the discriminator is a probability.
+
+\subsection{Design Choice}
+
+One of the design choices from the DCGAN architecture is \textbf{Adam}, an optimization algorithm. \newline
+
+A common error is that people forget to use a numerically stable version of \textbf{cross-entropy}, where the loss is computed using the \textbf{logits}. \newline
+
+\textbf{Logits} – the values produced by the discriminator right before the \textbf{sigmoid}.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//gan/numericallyStableCrossEntropy.png}
+\captionof{figure}{Numerically Stable Cross-Entropy}
+\label{fig:numericallyStableCE}
+
+\subsection{Tips for Training}
+
+\begin{enumerate}
+    \item A simple trick is to multiply the 0 or 1 labels by a number a bit less than 1. This is a GANs-specific label smoothing strategy similar to that used to regularize normal classifiers (see \autoref{fig:numericallyStableCE}).
+    \item For the generator loss, minimize cross-entropy with the labels flipped.
+\end{enumerate}
+
+\href{https://www.youtube.com/watch?v=iMvn7l6HztI&t=1s}{Youtube}
+\subsection{Scaling GANs}
+
+\textbf{Convolutional Neural Networks (CNN)} are needed to scale GANs to work on larger images. Scaling GANs relies on an understanding of:
+
+\begin{itemize}
+    \item \textbf{Classifier Convolutional Net –} starting with a tall and wide feature map and moving to very short and narrow feature maps
+    \item \textbf{Generator Net} – starting with short and narrow feature maps and moving to a wide and tall image
+    \item \textbf{Batch Normalization} – on potentially every layer except the output layer of the generator and the input layer of the discriminator
+\end{itemize}
+
+\subsection{Improved Training Techniques for GANs}
+
+The paper, \href{https://video.udacity-data.com/topher/2018/November/5bea0c6a_improved-training-techniques/improved-training-techniques.pdf}{\textbf{Improved Techniques for Training GANs (PDF)}}, describes improved training techniques for GANs!
+
+\subsection{Quiz}
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//gan/quiz2.png}
+
+Which of the following statements are true? (There are multiple correct choices - check all that apply)
+\begin{itemize}
+    \item \textbf{The binary cross entropy (BCE) loss can be used to train both the generator and the discriminator.}
+    \item \textbf{Label smoothing consists in multiplying the labels by a float smaller than 1.}
+    \item \textbf{When training the generator, the BCE loss is used with flipped labels (fake = 1, real = 0)}
+    \item \textbf{The BCE loss is only one of the possible loss functions to train a GAN. Many other options exist.}
+\end{itemize}
+
+\input{genAdvNet/MNIST_LOSS_Starter}
+
+\section{Exercise Part 2: Solution}
+\href{https://www.youtube.com/watch?v=wudXk5nPWgM}{Youtube}
+
+\section{Generating Fake Images}
+\href{https://www.youtube.com/watch?v=7KI4yITZLBk}{Youtube} \newline
+
+The next few pages will cover the practical implementation of GANs based on training the MNIST dataset.
+
+\subsection{Additional Resources}
+If you'd like to read about even more applications of GANs, I recommend reading \href{https://medium.com/@jonathan_hui/gan-some-cool-applications-of-gans-4c9ecca35900}{\textbf{GAN — Some cool applications of GANs (Medium Article)}}, which does an overview of interesting applications! \newline
+
+The tulip generation model was created by the artist Anna Ridler, and you can read about her data collection method and inspiration in the article, \href{https://www.fastcompany.com/90237233/this-ai-dreams-in-tulips}{\textbf{This AI dreams in tulips (Fast Company Article)}}.
+
+\section{MNIST GAN}
+\href{https://www.youtube.com/watch?v=g2CDYdc18Jg&t=1s}{Youtube} \newline
+
+The steps for building a GAN to generate new images can be summarized as follows:
+
+\begin{enumerate}
+    \item Create a classifier by training on dataset images
+    \item Create an adversarial training using a discriminator and generator
+    \begin{itemize}
+        \item The discriminator acts as a simple classifier distinguishing between real and fake images
+        \item The generator acts as an adversary with the goal of tricking the discriminator into tagging generated images as "real"
+    \end{itemize}
+    \item Define generator and discriminator networks with opposing goals and loss functions
+\end{enumerate}
+
+\subsection{Additional Resources}
+The MNIST data is a very popular dataset used when discussing GANs and you may see it referenced frequently. You can learn more about the MNIST dataset by reading the original documentation, \href{http://yann.lecun.com/exdb/mnist/}{\textbf{THE MNIST DATABASE of Handwritten Digits}}.
+
+\subsection{Quiz}
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//gan/quiz3.png}
+
+\input{genAdvNet/MNIST_GAN_Starter}
+\section{Exercise Part 3: Solution}
+\href{https://www.youtube.com/watch?v=HdhMtWz68Vo}{Youtube}

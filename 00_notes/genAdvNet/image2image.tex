@@ -1,0 +1,246 @@
+\chapter{Image to Image Translation}
+
+\section{Welcome to Image to Image Translation}
+\href{https://www.youtube.com/watch?v=vR2J4Z6zPlE&t=6s}{Youtube} \newline
+
+\textbf{Image to Image Translation} means using GANs to map from one type of image to another type, to create a new image. \newline
+
+This lesson will focus on a particular image-to-image translation architecture, known as the \textbf{CycleGAN} model.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/screen-shot-2022-05-11-at-4.59.11-pm.jpeg}
+\captionof{figure}{The process of image-to-image translation}
+By the end of this lesson, you will be able to:
+
+\begin{itemize}
+    \item \textbf{Implement unpaired images dataloaders}
+    \item \textbf{Build residual blocks and incorporate them in the CycleGAN generator}
+    \item \textbf{Train a CycleGAN model on an image dataset}
+\end{itemize}
+
+\section{Lesson Outline}
+\href{https://www.youtube.com/watch?v=7a6fILYRBUo}{Youtube} \newline
+
+In this lesson on \textbf{Image to Image Translation}, you will:
+
+\begin{itemize}
+    \item Build Unpaired Images Dataloader
+    \item Build the CycleGAN Generator
+    \item Implement the CycleGAN Loss Function
+    \item Train CycleGAN model
+\end{itemize}
+\section{Image to Image Translation}
+\href{https://www.youtube.com/watch?v=f-WnvKQd10k}{Youtube} \newline
+
+Generating new data is a challenging task; however, GAN models can learn something about the underlying structure of training data, to discern patterns that can be used to recreate images.\newline
+
+GANs can also be applied to \textbf{Image to Image Translation}.
+
+\textbf{Image to Image Translation} – takes an input image and produces a transformed image as output
+\subsection{Applications for Image to Image Translation}
+Deep learning and computer vision applications of image to image translation include:
+\begin{itemize}
+    \item Semantic Segmentation - every pixel in the input image is labeled and classified
+    \item Translating an image into a new domain with a desired property or feature
+\end{itemize}
+Pix2Pix and CycleGAN are two formulations of image to image translation that learn to transform an input image into a desired output and they can be applied to a variety of tasks.
+
+\subsection{Links to Related Work}
+\begin{itemize}
+    \item Ian Goodfellow's \href{http://papers.nips.cc/paper/5423-generative-adversarial-nets.pdf}{\textbf{Generative Adversarial Nets - Original GAN Paper (PDF)}}
+    \item Face swap with \href{https://arxiv.org/pdf/1712.03451.pdf}{\textbf{CycleGAN Face-off: Adversarial Example Research Paper (PDF)}}
+\end{itemize}
+
+\section{Designing Loss Functions}
+\href{https://www.youtube.com/watch?v=YL1kKWHr7Gc}{Youtube}
+\subsection{Objective Loss Functions}
+An objective function is typically a loss function that you seek to minimize (or in some cases maximize) during training a neural network. These are often expressed as a function that measures the difference between a prediction \(\hat{y}\) and a true target \(y\): \[\mathcal{L}(y, \hat{y})\]
+The objective function we've used the most in this program is \href{https://ml-cheatsheet.readthedocs.io/en/latest/loss_functions.html}{\textbf{cross entropy loss}}, which is a negative log loss applied to the output of a softmax layer. For a binary classification problem, as in \textit{real} or \textit{fake} image data, we can calculate the \textbf{binary cross entropy loss} as: \[-[y \log{\hat{y}} + (1 - y)\log{(1-\hat{y})}]\]
+In other words, a sum of two log losses! \newline
+
+In the notation in the \textit{next} video, you'll see that \(\hat{y}\) is the output of the discriminator; our predicted class.
+
+\subsection{Quiz}
+Why is the binary cross entropy loss not suited to assess how similar two images are? \newline
+
+Solution: The BCE Loss is great to classify an image using a single logit but is not a measure of distance between two images.
+
+
+\section{GANs, a Recap}
+\href{https://www.youtube.com/watch?v=MEKTiR1Xkjg}{Youtube} \newline
+
+\textbf{Note:} At 1:50, we need to fix the fake and real terms in the formula. In the expectation argument, the \textbf{fake term} should be \(\log{1 - D(G(z))}\), and the \textbf{real term} should be \(log(D(x))\).
+\subsection{Latent Space}
+Latent means "hidden" or "concealed". In the context of neural networks, a latent space often means a feature space, and \textbf{a latent vector is just a compressed, feature-level representation of an image}! \newline
+
+For example, when you created a simple autoencoder, the outputs that connected the encoder and decoder portion of a network made up a compressed representation that could also be referred to as a latent vector. \newline
+
+You can read more about latent space in [this blog post] as well as an interesting property of this space: recall that we can mathematically operate on vectors in vector space and with latent vectors, we can perform a kind of feature-level transformation on an image! \newline
+
+This manipulation of latent space has even been used to create an \href{https://github.com/junyanz/iGAN/blob/master/README.md}{\textbf{interactive GAN, iGAN}} for interactive image generation! I recommend reading the \href{https://arxiv.org/abs/1609.03552}{\textbf{Interactive Image Generation with Generative Adversarial Networks research paper on ArXiv}}.
+
+\section{Pix2Pix Generator}
+\href{https://www.youtube.com/watch?v=94Kml3ekrUI}{Youtube}
+
+In image to image translation tasks, we want a generator to locate an input image and produce the desired output. With sketches or edge as input images, x, and complete target images, y. \newline
+
+So with your typical GAN, we saw that a generator would turn a vector z into a generated image. So how can we change it, So that it is taking an image x and produce a new image \(G(x)\). One way to approach this task is to add some initial layers to the generator. The input sketch is put into a smaller feature level representations.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/pix2pixGen.png}
+
+The encoder is a series of convolutional and batch norm layers with some activation functions. The idea is that by compressing the input image,the encoder would learn to distill some information about the content of the input image and encode it into a smaller feature level representation.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/pix2pixGenEncoder.png}
+\captionof{figure}{Encoder}
+
+The decoder portion of each generator just looks like the same as a typical generator. A series of deconvolutional layers, and activation functions  cleverly reverse the actions of the encoder layers. The decoder will look at the feature level or partitioning of a sketch image and use that to generate a realistic looking output image.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/pix2pixGenDecoder.png}
+\captionof{figure}{Decoder}
+
+So in sum, the generator is responsible for applying a transformation to the input image x to generate output an image. This transformation will be the mapping that is used to generate new images from new sketches. So once we have this generator, we can then link its output to the discriminator, which will try to characterize the image as real or fake.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/pix2pixGAN.png}
+
+\subsection{Pix2Pix resources}
+If you're interested in learning more, take a look at the \href{https://arxiv.org/pdf/1611.07004.pdf}{\textbf{original Pix2Pix paper}}. I'd also recommend this related work on creating high-res images: \href{https://tcwang0509.github.io/pix2pixHD/}{\textbf{high resolution, conditional GANs}}.
+
+\section{Pix2Pix Discriminator}
+\href{https://www.youtube.com/watch?v=3Khqf7WtCxY}{Youtube} \newline
+
+In the Pix2Pix architecture, there needs to be a way to associate an input image with its correct output image.
+\begin{itemize}
+    \item The discriminator can be modified to measure the input and output
+    \item Instead of identifying a single image as real or fake, it will look at pairs of input and output images and output a value for a real pair or fake pair
+    \item This requires pair training data
+\end{itemize}
+\subsection{Edges to Cats Demo}
+Try out Christopher Hesse's \href{https://affinelayer.com/pixsrv/}{\textbf{image-to-image demo}} to get some really interesting (and sometimes creepy) results!
+
+\subsection{Quiz}
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/quiz1e.png}
+
+Solution: The Pix2Pix model required a paired dataloader that outputs the same observation in both domain. Using an encoder-decoder generator and a discriminator, we can learn the mapping from one domain to another.
+\section{CycleGANs \& Unpaired Data}
+\href{https://www.youtube.com/watch?v=-fbaRaXDqMY}{Youtube} \newline
+In practice, paired data is time-intensive and difficult to collect. In some cases, such as stylized images, paired data is impossible to get.\newline
+
+With unpaired data, there is no longer the ability to look at real and fake pairs of data - but the model can be changed to produce an output that belongs to the target domain.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/unpairedGAN.png}
+
+\textbf{Cycle Consistency Constraint} uses inverse mapping to accomplish this task.
+Many of the images in the video above are collected in the \href{https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix}{\textbf{Pix2Pix and CycleGAN Github repository}} developed by Jun-Yan.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/cycleGAN.png}
+
+And you can read the \href{https://arxiv.org/pdf/1703.10593.pdf}{\textbf{CycleGAN research paper on image-to-image translation on ArXiv (PDF)}}.
+
+\section{Exercise 1: CycleGAN Dataloader}
+\input{genAdvNet/CycleGan-Dataloader-Solution}
+Solution on \href{https://www.youtube.com/watch?v=GktDibcEs64&t=3s}{Youtube}
+
+\textbf{Notice:} At 1:24, the code in the \verb|In[6]| cell must be modified as follows.
+\begin{lstlisting}
+transform = Compose([Resize(image_size),  ToTensor(),  Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
+\end{lstlisting}
+This modification changes the value of \lstinline|image.min()| to -1 in the result of \lstinline|In[13]|. \newline
+
+This exercise solution is contained within the exercise notebook. Simply click the Jupyter icon to access the solution file.
+\section{Cycle Consistency Loss}
+\href{https://www.youtube.com/watch?v=pPbWXmVgY0k&t=1s}{Youtube}
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/forwardCycleConsistencyLoss.png}
+
+The difference between \(x\) and \(\hat{x}\) is the Cycle Consistency Loss. This loss term is a measure of how much these mapping contradict one another. They are also called \textit{reconstruction errors}.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/reconstructionError.png}
+
+Consistency between y-transformations is also being checked. For each image y from domain Y, the image transmission cycle should be able to bring y back to the original image. This is called \textbf{backwards cycle consistency}.
+
+\includegraphics[width=1\linewidth]{img//genAdvNet//image2image/backwardConsistencyLoss.png}
+
+The complete loss function of a CycleGAN is \[L_Y + L_X \lambda L_{cyc}\]  \(\lambda\) is the weight value that controls the rate of importance
+\subsection{Importance of Cycle Consistency}
+A really interesting place to check cycle consistency is in language translation. Ideally, when you translate one word or phrase from, say, English to Spanish, if you translate it \textit{back} (from Spanish to English) you will get the same thing! \newline
+
+In fact, if you are interested in natural language processing, I suggest you look into this as an area of research; even Google Translate has a tough time with this. In fact, as an exercise, I want you to see if Google Translate passes the following cycle consistency test.
+
+\includegraphics[width=0.5\linewidth]{img//genAdvNet//image2image/screen-shot-2018-11-12-at-4.05.54-pm.png}
+\captionof{figure}{Using an online translator for the word "aroma", from English to Spanish}
+
+
+\subsection{Quiz Question}
+Using English to Spanish translate, type in \textbf{aroma}, which typically means \textit{pleasant smell}. Then, click the back and forth arrows to switch domains and translate aroma from Spanish to English.\newline
+
+Check out the result; is this translation \textbf{cycle consistent}?
+\begin{itemize}
+    \item Yes
+    \item No
+\end{itemize}
+
+\section{Why Does This Work?}
+\href{https://www.youtube.com/watch?v=q7SP89u02L0&t=1s}{Youtube}
+\subsection{Model Shortcomings}
+As with any new formulation, it's important not only to learn about its strengths and capabilities but also, its weaknesses. A CycleGAN has a few shortcomings:
+\begin{itemize}
+    \item It will only show one version of a transformed output even if there are multiple, possible outputs.
+    \item A simple CycleGAN produces low-resolution images, though there is some research around \href{https://github.com/NVIDIA/pix2pixHD}{\textbf{high-resolution GANs}}
+    \item It occasionally fails!
+\end{itemize}
+
+\section{Exercise 2: CycleGAN Generator \& Loss}
+\input{genAdvNet/CycleGan-Generator-Loss-Solution}
+
+\section{Exercise 2: Solution}
+\href{https://www.youtube.com/watch?v=rJh4rFyMr00}{Youtube}
+
+
+\section{Exercise 3: CycleGAN}
+\input{genAdvNet/CycleGAN_Solution}
+\section{Exercise 3: Solution}
+\href{https://www.youtube.com/watch?v=d1iaODMAk0I}{Youtube}
+
+\section{Beyond CycleGANs}
+\href{https://www.youtube.com/watch?v=Kuz7cdnRUh4}{Youtube}
+\subsection{Additional Resources}
+For additional resources, check out the \href{https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix}{\textbf{GitHub repository for Pix2Pix and CycleGAN}} formulations. The models are implemented in PyTorch and the repository belongs to Jun-Yan Zhu. \newline
+
+It's a great resource because it uses other datasets and shows the results.
+
+\begin{itemize}
+    \item \href{https://arxiv.org/abs/1802.10151}{\textbf{Augmented CycleGAN}}
+    \item Implementation of \href{https://github.com/yunjey/StarGAN}{\textbf{StarGAN}}
+\end{itemize}
+
+\section{When to Use Image to Image Translation}
+\href{https://www.youtube.com/watch?v=YmDHVoTmXIs}{Youtube} \newline
+
+One of the challenges with deep learning based solutions is the amount of required data. It takes a significant amount effort and money to:
+
+\begin{itemize}
+    \item \textbf{Capture real data}
+    \item \textbf{Clean real data}
+    \item \textbf{Annotate real data}
+\end{itemize}
+
+\subsection{Alternative Data Sources}
+Another source for data is \textbf{computer generated data} or \textbf{synthetic data}. Synthetic data can be used to train models on tasks such as object detection or classification. \newline
+
+However, because synthetic images are still quite different from real images and model performance is usually not on par with models trained on real data. \newline
+
+The difference between the real and the synthetic domain is called \textbf{domain gap.}
+
+\section{Lesson Review}
+\href{https://www.youtube.com/watch?v=DqqdTYYVA0w}{Youtube} \newline
+
+This lesson focused on implementing Image to Image Translation and you accomplished a lot.
+
+Over the course of this lesson you:
+
+\begin{itemize}
+    \item Create unpaired image dataloaders
+    \item Created an encoder-decoder generator using residual blocks
+    \item Implemented CycleGAN loss functions
+    \item Trained a CycleGAN model on the summer2winter yosemite dataset.
+\end{itemize}

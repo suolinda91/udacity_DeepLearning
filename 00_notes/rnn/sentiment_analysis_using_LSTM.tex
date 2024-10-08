@@ -1,0 +1,158 @@
+\section{Sentiment Analysis using
+LSTM}\label{sentiment-analysis-using-lstm}
+
+\begin{lstlisting}[language=Python]
+import torch
+import torch.nn as nn
+import torch.optim as optim
+\end{lstlisting}
+
+\begin{lstlisting}
+/opt/venv/lib/python3.10/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+\end{lstlisting}
+
+\paragraph{Prepare data}\label{prepare-data}
+
+\begin{lstlisting}[language=Python]
+# Sentences (textual data) and their sentiment labels (1 for positive, 0 for negative)
+sentences = ["i love this movie", "this film is amazing", "i didn't like it", "it was terrible"]
+sentiment = [1, 1, 0, 0]
+\end{lstlisting}
+
+\paragraph{Create Vocabulary}\label{create-vocabulary}
+
+\begin{lstlisting}[language=Python]
+# Simple vocabulary to represent words as indices
+vocab = {"<PAD>": 0, "i": 1, "love": 2, "this": 3, "movie": 4, "film": 5, "is": 6, "amazing": 7, "didn't": 8, "like": 9, "it": 10, "was": 11, "terrible": 12}
+\end{lstlisting}
+
+We create a simple vocabulary to represent words as indices. This allows
+us to convert words in our sentences to numbers, which can be fed as
+input to our neural network.
+
+\paragraph{Tokenize, encode and pad
+sentences}\label{tokenize-encode-and-pad-sentences}
+
+\begin{lstlisting}[language=Python]
+encoded_sentences = [[vocab[word] for word in sentence.split()] for sentence in sentences]
+max_length = max([len(sentence) for sentence in encoded_sentences])
+padded_sentences = [sentence + [vocab["<PAD>"]] * (max_length - len(sentence)) for sentence in encoded_sentences]
+\end{lstlisting}
+
+We tokenize and encode the sentences using the vocabulary created
+earlier. We also pad the sentences with the
+\lstinline{<PAD>} token to make them all the same length.
+
+\paragraph{Convert data to tensors}\label{convert-data-to-tensors}
+
+\begin{lstlisting}[language=Python]
+inputs = torch.LongTensor(padded_sentences)
+labels = torch.FloatTensor(sentiment)
+\end{lstlisting}
+
+We convert the input data and labels to PyTorch tensors. Inputs are
+converted to LongTensors, while labels are converted to FloatTensors.
+
+\paragraph{Define LSTM Model}\label{define-lstm-model}
+
+\begin{lstlisting}[language=Python]
+class SimpleLSTM(nn.Module):
+    def __init__(self, vocab_size, embedding_dim, hidden_dim, output_dim):
+        super(SimpleLSTM, self).__init__()
+        self.embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim)
+        self.fc = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        embedded = self.embedding(x)
+        output, (hidden, _) = self.lstm(embedded)
+        logits = self.fc(hidden.squeeze(0))
+        return logits
+\end{lstlisting}
+
+We define a simple LSTM model class that inherits from
+\lstinline{nn.Module}. The model consists of an embedding
+layer, an LSTM layer, and a fully connected (linear) layer. The forward
+method takes an input tensor \lstinline{x}, passes it
+through the embedding layer, the LSTM layer, and finally the fully
+connected layer to produce the output logits.
+
+\paragraph{Instantiate model and define loss and
+optimizer}\label{instantiate-model-and-define-loss-and-optimizer}
+
+\begin{lstlisting}[language=Python]
+model = SimpleLSTM(len(vocab), embedding_dim=10, hidden_dim=20, output_dim=1)
+criterion = nn.BCEWithLogitsLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+\end{lstlisting}
+
+We instantiate the LSTM model with the vocabulary size, embedding
+dimensions, hidden dimensions, and output dimensions. We also define the
+binary cross-entropy with logits loss
+(\lstinline{BCEWithLogitsLoss}) and the Adam optimizer.
+
+\paragraph{Train the model}\label{train-the-model}
+
+\begin{lstlisting}[language=Python]
+epochs = 1000
+for epoch in range(epochs):
+    optimizer.zero_grad()
+    predictions = model(inputs.t()).squeeze(1)
+    loss = criterion(predictions, labels)
+    loss.backward()
+    optimizer.step()
+
+    if (epoch + 1) % 100 == 0:
+        print(f"Epoch: {epoch + 1}, Loss: {loss.item()}")
+\end{lstlisting}
+
+\begin{lstlisting}
+Epoch: 100, Loss: 0.15219397842884064
+Epoch: 200, Loss: 0.02454642578959465
+Epoch: 300, Loss: 0.010403754189610481
+Epoch: 400, Loss: 0.006161490920931101
+Epoch: 500, Loss: 0.004242383409291506
+Epoch: 600, Loss: 0.0031633577309548855
+Epoch: 700, Loss: 0.002477444475516677
+Epoch: 800, Loss: 0.0020062942057847977
+Epoch: 900, Loss: 0.0016651706537231803
+Epoch: 1000, Loss: 0.001408295938745141
+\end{lstlisting}
+
+We train the model for 1000 epochs. In each epoch, we:
+
+\begin{itemize}
+\item Reset the gradients by calling optimizer.zero\_grad()
+\item Get the model's predictions for the input sentences by calling model(inputs.t()).squeeze(1)
+\item Calculate the loss between the predictions and the true labels using the criterion defined earlier
+\item Perform backpropagation by calling loss.backward()
+\item Update the model's parameters by calling optimizer.step()
+\item We also print the loss every 100 epochs for monitoring the training progress.
+\end{itemize}
+
+\paragraph{Test the model}\label{test-the-model}
+
+\begin{lstlisting}[language=Python]
+with torch.no_grad():
+    test_sentences = ["i love this film", "it was terrible"]
+    encoded_test_sentences = [[vocab[word] for word in sentence.split()] for sentence in test_sentences]
+    padded_test_sentences = [sentence + [vocab["<PAD>"]] * (max_length - len(sentence)) for sentence in encoded_test_sentences]
+    test_inputs = torch.LongTensor(padded_test_sentences)
+    test_predictions = torch.sigmoid(model(test_inputs.t()).squeeze(1))
+    print("Test predictions:", test_predictions)
+\end{lstlisting}
+
+\begin{lstlisting}
+Test predictions: tensor([0.9958, 0.0011])
+\end{lstlisting}
+
+We test the model on two new sentences. First, we tokenize, encode, and
+pad the test sentences in the same way as we did for the training
+sentences. We then convert the test sentences to PyTorch tensors and
+pass them through the model. We apply the sigmoid function to the output
+logits to obtain the final predictions, which represent the probability
+of each sentence being positive.
+
+The resulting \lstinline{test\_predictions} tensor
+contains the model's sentiment predictions for the given test sentences.

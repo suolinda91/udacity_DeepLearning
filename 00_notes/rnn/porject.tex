@@ -1,0 +1,32 @@
+
+\section{Project Overview:}
+
+The objective of this project is to analyze the sentiment of movie reviews in three different languages - English, French, and Spanish. We have been given 30 movies, 10 in each language, along with their reviews and synopses in separate CSV files named \verb|movie_reviews_eng.csv|, \verb|movie_reviews_fr.csv|, and \verb|movie_reviews_sp.csv|.
+
+\begin{itemize}
+    \item The first step of this project is to read data from all the .csv files and create a single pandas dataframe. This dataframe should have the following columns - \textbf{Title}, \textbf{Year}, \textbf{Synopsis}, \textbf{Review}, and \textbf{Original Language}.
+    \item The next step is to convert the French and Spanish reviews and synopses into English. This will allow us to analyze the sentiment of all reviews in the same language. We will be using pre-trained transformers from HuggingFace to achieve this task.
+    \item Finally, we will use pretrained transformers from HuggingFace to analyze the sentiment of each review. The sentiment analysis results (\textbf{Positive} or \textbf{Negative}) will be added to the dataframe in a new column called \textbf{Sentiment}.
+\end{itemize}
+The output of the project will be a CSV file with a header row that includes column names such as \textbf{Title}, \textbf{Year}, \textbf{Synopsis}, \textbf{Review}, \textbf{Sentiment}, and \textbf{Original Language}. The \textbf{Original Language} column will indicate the language of the review and synopsis (\textit{en/fr/sp}) before translation. The dataframe will consist of 30 rows, with each row corresponding to a movie.
+
+\subsection{Tools used:}
+
+\begin{itemize}
+    \item Pandas: for data manipulation and analysis
+    \item HuggingFace Transformers: for natural language processing tasks, such as translation and sentiment analysis
+    \item PyTorch: for building and training machine learning models
+\end{itemize}
+
+\subsection{Skills learned:}
+
+\begin{itemize}
+    \item Data cleaning and manipulation using Pandas
+    \item Natural language processing techniques, such as translation and sentiment analysis, using HuggingFace Transformers
+    \item Building and training machine learning models using PyTorch Integration of multiple tools and libraries to solve a complex problem
+\end{itemize}
+Overall, this project combines data manipulation, natural language processing, and machine learning techniques to perform multiple tasks on a dataset.
+
+\subsection{Project Submission}
+
+Ensure that you go through \href{https://learn.udacity.com/rubric/5164}{\textbf{this rubric}} and meet all criteria before submitting the project.

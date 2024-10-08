@@ -1,0 +1,226 @@
+\chapter{Introduction to LSTM}
+
+\section{Lesson Overview}
+\href{https://www.youtube.com/watch?v=CH9O_fNGR2Q&ab_channel=Udacity}{Youtube} \newline
+
+In this lesson, we will cover the following topics:
+
+\begin{itemize}
+    \item LSTM Overview
+    \item LSTM Architecture and Gates
+\end{itemize}
+By the end of the lesson, you'll be able to:
+
+\begin{itemize}
+    \item Explain how LSTMs overcome the limitations of RNNs
+    \item Implement the LSTM architecture
+\end{itemize}
+
+\section{RNN vs LSTM}
+\href{https://www.youtube.com/watch?v=70MgF-IwAr8&ab_channel=Udacity}{Youtube}
+\subsection{Vanishing Gradient Problem}
+The problem with RNNs is that memory stored in an RNN can be effective short-term memory. This is due to the "Vanishing Gradient Problem." The Vanishing Gradient Problem happens when the gradient of a deep layer of the neural network is "diluted" and has a reduced effect on the network. This is due to the nature of the activation functions of the RNN that can diminish the effect of the gradients of the deeper layer over time. \newline
+
+The LSTM solves the problem by introducing an operation to maintain the long-term memory of the network. We will learn about these gates in subsequent lessons.
+
+\includegraphics[width=1\linewidth]{img//rnn//lstm/longsthirttermmemory.png}
+
+\section{From RNN to LSTM}
+
+Before we take a close look at the \textbf{Long Short-Term Memory (LSTM)} cell, let's take a look at the following video: \href{https://www.youtube.com/watch?v=MsqybcWmzGY&ab_channel=Udacity}{Youtube} \newline
+
+\textbf{Long Short-Term Memory Cells}, \href{http://www.bioinf.jku.at/publications/older/2604.pdf}{\textbf{(LSTM)}} give a solution to the vanishing gradient problem, by helping us apply networks that have temporal dependencies. They were proposed in 1997 by \href{https://en.wikipedia.org/wiki/Sepp_Hochreiter}{\textbf{Sepp Hochreiter}} and \href{http://people.idsia.ch/~juergen/}{\textbf{Jürgen Schmidhuber}} \newline
+
+If we look closely at the RNN neuron, we see that we have simple linear combinations (with or without an activation function). We can also see that we have a single addition. \newline
+
+Zooming in on the neuron, we can graphically see this in the following configuration:
+
+\includegraphics[width=0.5\linewidth]{img//rnn//lstm/screen-shot-2017-11-27-at-3.46.35-pm.png}
+\captionof{figure}{Closeup Of The RNN Neuron}
+
+\begin{itemize}
+    \item Calculating the next stage: \(\overline{S}_{t+1} = \Phi (\overline{x}_{t+1} \cdot W_x + \overline{S}_t \cdot W_s)\)
+    \item Calculating the output: \(\overline{y}_{t+1} = \overline{S}_{t+1} \cdot W_y\)
+\end{itemize}
+
+The \textbf{LSTM} cell is a bit more complicated. If we zoom in on the cell, we can see that the mathematical configuration is the following:
+
+\includegraphics[width=0.5\linewidth]{img//rnn//lstm/screen-shot-2017-11-27-at-3.44.20-pm.png}
+\captionof{figure}{Closeup Of the LSTM Cell}
+
+Instead of a single calculation, we have 4 separate calculations:
+\begin{enumerate}
+    \item Sigma
+    \item Hyperbolic tangent
+    \item Multiplication
+    \item Addition
+\end{enumerate}
+
+The LSTM cell allows a recurrent system to learn over many time steps without the fear of losing information due to the vanishing gradient problem. It is fully differentiable, therefore allowing us to use backpropagation when updating the weights easily. \newline
+
+The main idea with LSTM cells is that they can decide which information to remove/forget, which information to store, and when to use it. The cell can also help decide when to move the previous state's information to the next. \newline
+
+The LSTM cell has 3 sigmoids. The output of each sigmoid is between 0 and 1. This decides whether the data passes through or not.
+
+\begin{itemize}
+    \item All data passes through \(\sigma (x) \approx 1\)
+    \item Data does not pass through: \(\sigma(x) \approx 0\)
+\end{itemize}
+
+Sigmoids act as a mechanism to filter
+\begin{itemize}
+    \item What goes into the cell, if at all
+    \item What retains within the cell
+    \item What passes to the output
+\end{itemize}
+
+\section{Basics of LSTM}
+\href{https://www.youtube.com/watch?v=gjb68a4XsqE&t=5s&ab_channel=Udacity}{Youtube} \newline
+
+In this video, we learned the basics of the LSTM. We have listed them below.
+
+\includegraphics[width=1\linewidth]{img//rnn//lstm/basicsoflstm.png}
+
+\textbf{Inputs}:
+\begin{itemize}
+    \item Long Term Memory
+    \item Short Term Memory
+    \item Input Vector (Event)
+\end{itemize}
+
+\textbf{Gates}:
+\begin{itemize}
+    \item Forget Gate
+    \item Learn Gate
+    \item Remember Gate
+    \item Use Gate
+\end{itemize}
+\textbf{Outputs}:
+\begin{itemize}
+    \item New Long-Term Memory
+    \item New Short-Term Memory
+\end{itemize}
+
+So the \textit{long term memory} goes to the forget gate where it forgets everything that it doesn't consider useful. The \textit{short term memory} and the \textit{event} are joined together in the \textit{learn gate}, containing the information that we've recently learned and it removes any unnecessary information.
+
+Now the long term memory that we haven't forgotten yet plus the new information that we've learned get joined together in the \textit{remember gate}. This gate puts these two together and since it's called remember gate, what it does is it outputs an\textit{ updated long term memory}. So this is what we'll remember for the future.
+
+And finally, the \textit{use gate} is the one that decides what information we use from what we previously know plus what we just learned to make a prediction so it also takes those inputs the long term memory,
+and the new information joins them and decides what to output.
+The \textit{output} becomes both the \textit{prediction} and the \textit{new short term memory}.
+
+\includegraphics[width=1\linewidth]{img//rnn//lstm/basicsoflstm_general.png}
+
+
+\section{Architecture of LSTM}
+\href{https://www.youtube.com/watch?v=ycwthhdx8ws&t=4s&ab_channel=Udacity}{Youtube}
+
+\includegraphics[width=1\linewidth]{img//rnn//lstm/rnnArchitecture.png}
+
+\includegraphics[width=1\linewidth]{img//rnn//lstm/lstmArchitecture.png}
+
+\subsubsection{Quiz Question}
+
+Check the important pieces of an LSTM architecture
+
+The inputs of the input vector, LTM, and STM
+\begin{itemize}
+    \item \textbf{The inputs of the input vectors, LTM, and STM}
+    \item The modulation factor
+    \item \textbf{Forget, Learn, Remember, and Use Gates}
+    \item The normalization gate
+    \item \textbf{The Hidden State}
+    \item \textbf{The outputs of the LTM and STM}
+    \item \textbf{The Cell State}
+\end{itemize}
+
+\section{LSTM Gates}
+
+\subsection{The Learn Gate}
+\href{https://www.youtube.com/watch?v=aVHVI7ovbHY&t=2s&ab_channel=Udacity}{Youtube} \newline
+
+The Learn Gate takes the short term memory (STM) and the event and joins them. Then it ignores a bit of it, keeping the important part. 
+
+\includegraphics[width=1\linewidth]{img//rnn//lstm/learngate1.png}
+
+The output of the \textit{Learn Gate} is \(N_t i_t\) where: 
+\begin{equation} \label{eq:LearnGate}
+\begin{split}
+     N_t &= tanh(W_n [STM_{t-1}, E_t] + b_n) \\
+    i_t &= \sigma(W_i [STM_{t-1}, E_t] + b_i)
+\end{split}
+\end{equation}
+\begin{itemize}
+    \item STM = Short term memory
+    \item \(E_t\) = Event
+    \item \(N_t\) = new information
+\end{itemize}
+In order to ignore part of the new information, we need to multiply the new information \(N_t\) with the ignore factor, \(i_t\), elementwise. 
+
+\subsection{The Forget Gate}
+\href{https://www.youtube.com/watch?v=iWxpfxLUPSU&ab_channel=Udacity}{Youtube} \newline
+
+The output of the \textit{Forget Gate} is \(LTM_{t-1} f_t\) where:
+\begin{equation}\label{eq:forgetGate}
+    f_t = \sigma(W_f[STM_{t-1}, E_t] + b_f)
+\end{equation}
+\begin{itemize}
+    \item LTM = Long Term Memory
+    \item \(f_t\) = Forget factor
+\end{itemize}
+
+\subsection{The Remember Gate}
+\href{https://www.youtube.com/watch?v=0qlm86HaXuU&ab_channel=Udacity}{Youtube} \newline
+
+The \textit{remember gate} takes the LTM coming out of the \textit{forget gate} and the STM coming out of the \textit{learn gate} and simply combines them together. 
+
+The output of the \textit{Remember Gate} is:
+\begin{equation}
+    LTM_{t-1} f_t + N_t i_t
+\end{equation}
+(\(N_t\), \(i_t\), and \(f_t\) are calculated in \autoref{eq:LearnGate} and \autoref{eq:forgetGate})
+
+
+\subsection{The Use Gate}
+\href{https://www.youtube.com/watch?v=IFBXQBfnS5g&ab_channel=Udacity}{Youtube} \newline
+
+The output of the \textit{Use Gate} is \(U_t V_t\) where:
+\begin{equation}
+    \begin{split}
+        U_t &= tanh(W_u LTM_{t-1} f_t + b_u) \\
+        V_t &= \sigma(W_v [STM_{t-1}, E_t] + b_v)
+    \end{split}
+\end{equation}
+The output is \(STM_t = U_t \cdot V_t\)
+
+\subsection{Quiz Question}
+
+Match each LSTM gate to it's function.
+
+\includegraphics[width=1\linewidth]{img//rnn//lstm/gates_quiz.png}
+
+\subsection{Putting it together}
+\href{https://www.youtube.com/watch?v=IF8FlKW-Zo0&ab_channel=Udacity}{Youtube}
+
+\section{Quiz}
+If you would like to deepen your knowledge even more, go over the following \href{https://web.archive.org/web/20190106151528/https://skymind.ai/wiki/lstm}{\textbf{tutorial}}. Focus on the overview titled: \textbf{Long Short-Term Memory Units (LSTMs)}. \newline
+
+If you are feeling confident enough, skip the overview and jump right into our next question:
+
+\includegraphics[width=0.5\linewidth]{img//rnn//lstm/screen-shot-2017-11-16-at-5.54.40-pm.png}
+\captionof{figure}{The LSTM cell- taken form the Deep Learning tutorial}
+
+
+\subsubsection{Quiz Question}
+
+The illustration above is of a LSTM cell. What would be the values of the three gates in situations where the cell retains information for a long period, without accepting a new input or producing an output?
+
+\begin{itemize}
+    \item \textbf{The inputs gate: close to 0; the forget gate: close to 1; the output gate: close to 0}
+    \item The inputs gate: close to 1; the forget gate: close to 1; the output gate: close to 0
+    \item The inputs gate: close to 0; the forget gate: close to 0; the output gate: close to 0
+    \item The inputs gate: close to 0; the forget gate: close to 1; the output gate: close to 1
+\end{itemize}
+
+\input{rnn/predicting_temp_using_LSTM}
+\input{rnn/sentiment_analysis_using_LSTM}

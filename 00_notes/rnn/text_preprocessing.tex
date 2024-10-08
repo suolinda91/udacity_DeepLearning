@@ -1,0 +1,109 @@
+\begin{lstlisting}[language=Python]
+import nltk
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+\end{lstlisting}
+
+\begin{lstlisting}
+[nltk_data] Downloading package punkt to /home/student/nltk_data...
+[nltk_data]   Unzipping tokenizers/punkt.zip.
+[nltk_data] Downloading package stopwords to
+[nltk_data]     /home/student/nltk_data...
+[nltk_data]   Unzipping corpora/stopwords.zip.
+[nltk_data] Downloading package wordnet to /home/student/nltk_data...
+[nltk_data] Downloading package omw-1.4 to /home/student/nltk_data...
+\end{lstlisting}
+
+\subsubsection{Load data}\label{load-data}
+
+Next, we need to load the data that we want to preprocess. In this
+example, we will use the following sentence:
+
+\begin{lstlisting}[language=Python]
+text = "The quick brown fox jumped over the lazy dog."
+\end{lstlisting}
+
+\subsubsection{Text Normalization}\label{text-normalization}
+
+Text normalization is the process of converting text into a standard
+format. This involves converting all characters to lowercase and
+removing any punctuation.
+
+\begin{lstlisting}[language=Python]
+# Convert to lowercase
+text = text.lower()
+
+# Remove punctuation
+text = ''.join(c for c in text if c not in '.,;:-')
+\end{lstlisting}
+
+\subsubsection{Tokenization}\label{tokenization}
+
+Tokenization is the process of splitting a sentence into individual
+words or tokens.
+
+\begin{lstlisting}[language=Python]
+# Tokenize the text
+tokens = word_tokenize(text)
+\end{lstlisting}
+
+\subsubsection{Stopword Removal}\label{stopword-removal}
+
+Stopwords are common words that do not carry much meaning and can be
+removed from the text. We will use NLTK's list of stopwords and remove
+them from the tokenized text.
+
+\begin{lstlisting}[language=Python]
+# Remove stopwords
+stop_words = set(stopwords.words('english'))
+filtered_tokens = [word for word in tokens if word not in stop_words]
+\end{lstlisting}
+
+\subsubsection{Stemming}\label{stemming}
+
+Stemming is the process of reducing a word to its base or root form. We
+will use Porter stemmer from NLTK for stemming.
+
+\begin{lstlisting}[language=Python]
+# Perform stemming
+stemmer = PorterStemmer()
+stemmed_tokens = [stemmer.stem(word) for word in filtered_tokens]
+\end{lstlisting}
+
+\subsubsection{Lemmatization}\label{lemmatization}
+
+Lemmatization is the process of converting a word to its base or
+dictionary form. We will use WordNet lemmatizer from NLTK for
+lemmatization.
+
+\begin{lstlisting}[language=Python]
+# Perform lemmatization
+lemmatizer = WordNetLemmatizer()
+lemmatized_tokens = [lemmatizer.lemmatize(word) for word in filtered_tokens]
+\end{lstlisting}
+
+\subsubsection{Output the results}\label{output-the-results}
+
+Finally, we will output the results of each step of the text
+preprocessing process.
+
+\begin{lstlisting}[language=Python]
+print("Original text: ", text)
+print("Tokenized text: ", tokens)
+print("Filtered tokens: ", filtered_tokens)
+print("Stemmed tokens: ", stemmed_tokens)
+print("Lemmatized tokens: ", lemmatized_tokens)
+\end{lstlisting}
+
+\begin{lstlisting}
+Original text:  the quick brown fox jumped over the lazy dog
+Tokenized text:  ['the', 'quick', 'brown', 'fox', 'jumped', 'over', 'the', 'lazy', 'dog']
+Filtered tokens:  ['quick', 'brown', 'fox', 'jumped', 'lazy', 'dog']
+Stemmed tokens:  ['quick', 'brown', 'fox', 'jump', 'lazi', 'dog']
+Lemmatized tokens:  ['quick', 'brown', 'fox', 'jumped', 'lazy', 'dog']
+\end{lstlisting}

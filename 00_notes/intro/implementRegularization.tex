@@ -1,0 +1,125 @@
+\section{Implementing Regularization}\label{implementing-regularization}
+
+In this exercise, you will implement both L1 and L2 regularization from
+scratch in NumPy. In PyTorch, L2 regularization is typically handled in
+the optimizer, via the \lstinline!weight\_decay!
+parameter, but we will also implement a manual L1 and L2 loss penalty in
+PyTorch.
+
+\begin{lstlisting}[language=Python]
+# DO NOT EDIT THIS CELL
+import numpy as np
+import torch
+from torch import nn
+from torch import optim
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from torchvision import transforms
+from torchvision import datasets
+import matplotlib.pyplot as plt
+\end{lstlisting}
+
+\subsection{L1 Regularization -- Numpy}\label{l1-regularization-numpy}
+
+L1 regularization is the sum of the absolute values of the weights times
+a scaling constant, lambda. Below, you will define the function
+\lstinline!l1\_regularization! that accepts an input
+vector and a scalar constant, lambda.
+
+\textbf{NOTE:} We use the variable name \lstinline!lamb!
+rather than \lstinline!lambda! since
+\lstinline!lambda! is a keyword in Python.
+
+\begin{lstlisting}[language=Python]
+def l1_regularization(weights, lamb):
+    absolute_weights = np.abs(weights)
+    return lamb * np.sum(absolute_weights)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# Grading code. Run this cell to test your code!
+grading_vector = np.array([1, -2, 3, -4])
+assert l1_regularization(grading_vector, 0.5) == 5, f"Your L1 regularization implementation seems to be incorrect. Expected 5, got {l1_regularization(grading_vector, 0.5)}"
+assert l1_regularization(grading_vector, 1) == 10, f"Your L1 regularization implementation seems to be incorrect. Expected 10, got {l1_regularization(grading_vector, 1)}"
+
+print("Great work!")
+\end{lstlisting}
+
+\begin{lstlisting}
+Great work!
+\end{lstlisting}
+
+\subsection{L2 Regularization -- Numpy}\label{l2-regularization-numpy}
+
+L2 regularization squares the weights inside the vector and returns the
+sum of those squares times a scaling constant, lambda. Below, you will
+define the function \lstinline!l2\_regularization!, which
+accepts an input vector and a scalar constant, lambda.
+
+\begin{lstlisting}[language=Python]
+def l2_regularization(weights, lamb):
+    squared_weights = np.dot(weights, weights.T)
+    return lamb * squared_weights
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# Grading code. Run this cell to test your code!
+grading_vector = np.array([0.5, -1, 1.5, -2])
+assert l2_regularization(grading_vector, 0.5) == 3.75, f"Your L2 regularization implementation seems to be incorrect. Expected 3.75, got {l2_regularization(grading_vector, 0.5)}"
+assert l2_regularization(grading_vector, 1) == 7.5, f"Your L2 regularization implementation seems to be incorrect. Expected 7.5, got {l2_regularization(grading_vector, 1)}"
+
+print("Great work!")
+\end{lstlisting}
+
+\begin{lstlisting}
+Great work!
+\end{lstlisting}
+
+\subsection{Regularization in PyTorch}\label{regularization-in-pytorch}
+
+Although L2 regularization is typically handled via the
+\lstinline!weight\_decay! parameter in your optimizer, we
+can compute L1 and L2 regularization by hand. We do this by iterating
+over the parameters in our model using the
+\lstinline!net.parameters()! method.
+
+Rather than establishing a model, training it, and testing it, we will
+manually set the model weights.
+
+\begin{lstlisting}[language=Python]
+# Setting up our net for testing
+net = nn.Sequential(nn.Linear(4, 1, bias=False))
+# Make it so autograd doesn't track our changes
+with torch.no_grad():
+    net[0].weight = nn.Parameter(torch.ones_like(net[0].weight))
+    net[0].weight.fill_(2.0)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# Define L1 loss
+def l1_torch(model, lamb):
+    return lamb * sum([p.abs().sum() for p in model.parameters()])
+
+# Define L2 loss
+def l2_torch(model, lamb):
+    return lamb * sum([(p**2).sum() for p in model.parameters()])
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# Grading code
+assert l1_torch(net, 1) == 8, f"There is something wrong with your L1 regularization implementation. Expected 8, got {l1_torch(net, 1)}"
+assert l1_torch(net, 0.5) == 4, f"There is something wrong with your L1 regularization implementation. Expected 4, got {l1_torch(net, 0.5)}"
+
+assert l2_torch(net, 1) == 16, f"There is something wrong with your L2 regularization implementation. Expected 16, got {l2_torch(net, 1)}"
+assert l2_torch(net, 0.25) == 4, f"There is something wrong with your L2 regularization implementation. Expected 4, got {l2_torch(net, 0.25)}"
+
+print("Great work!")
+\end{lstlisting}
+
+\begin{lstlisting}
+Great work!
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+\end{lstlisting}
+

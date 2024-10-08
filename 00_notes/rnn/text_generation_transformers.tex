@@ -1,0 +1,87 @@
+\section{Text Generation using pre-trained HuggingFace Transformer
+models}\label{text-generation-using-pre-trained-huggingface-transformer-models}
+
+\subsection{Step 1: Load the pre-trained GPT-2
+model}\label{step-1-load-the-pre-trained-gpt-2-model}
+
+\begin{lstlisting}[language=Python]
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
+
+# Load pre-trained GPT-2 model and tokenizer
+model_name = "gpt2"
+model = GPT2LMHeadModel.from_pretrained(model_name)
+tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+\end{lstlisting}
+
+\begin{lstlisting}
+/opt/venv/lib/python3.10/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+\end{lstlisting}
+
+\subsection{Step 2: Define the prompt
+text}\label{step-2-define-the-prompt-text}
+
+\begin{lstlisting}[language=Python]
+# Define the prompt text
+prompt = "The quick brown fox"
+\end{lstlisting}
+
+\subsection{Step 3: Generate text using the GPT-2
+model}\label{step-3-generate-text-using-the-gpt-2-model}
+
+\begin{lstlisting}[language=Python]
+# Generate text using the GPT-2 model
+input_ids = tokenizer.encode(prompt, return_tensors="pt")
+output = model.generate(input_ids, max_length=50, do_sample=True)
+
+# Decode the generated text
+generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
+print(generated_text)
+\end{lstlisting}
+
+\begin{lstlisting}
+The attention mask and the pad token id were not set. As a consequence, you may observe unexpected behavior. Please pass your input's `attention_mask` to obtain reliable results.
+Setting `pad_token_id` to `eos_token_id`:50256 for open-end generation.
+
+
+The quick brown foxes, a new species and then some, are the same from year to year.
+
+That's why some of the latest sightings are often the same.
+
+"We can see all kinds of people, you can hear
+\end{lstlisting}
+
+In this example, we used the pre-trained GPT-2 model to generate text
+based on a prompt. We first loaded the model and tokenizer using the
+Hugging Face Transformers library. Then, we defined the prompt text that
+we want the model to generate text from. Finally, we used the
+\lstinline{generate()} method to generate text from the
+prompt and decode the generated text using the tokenizer. \newline
+
+Note that the \lstinline{generate()} method takes several
+arguments, including \lstinline{max_length}, which
+controls the maximum length of the generated text, and
+\lstinline{do_sample}, which enables sampling from the
+model distribution to generate diverse outputs. \newline
+
+This is just a simple example of text generation using the Hugging Face
+Transformers library. With this powerful library, you can explore a wide
+range of models and tasks in NLP, from language translation to question
+answering and beyond. \newline
+
+TODO:
+
+Try
+\href{https://huggingface.co/models?pipeline_tag=text-generation&sort=downloads}{other
+text generation models} from HuggingFace with different prompts.
+
+\begin{lstlisting}[language=Python]
+from transformers import pipeline
+
+generator = pipeline('text-generation', model="facebook/opt-125m")
+generator(prompt)
+\end{lstlisting}
+
+\begin{lstlisting}
+[{'generated_text': "The quick brown fox is a good one.\nI've been using it for a while now."}]
+\end{lstlisting}

@@ -1,0 +1,104 @@
+\begin{lstlisting}[language=Python]
+import torch
+import nltk
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+\end{lstlisting}
+
+\begin{lstlisting}
+/opt/venv/lib/python3.10/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+[nltk_data] Downloading package punkt to /home/student/nltk_data...
+[nltk_data]   Unzipping tokenizers/punkt.zip.
+[nltk_data] Downloading package stopwords to
+[nltk_data]     /home/student/nltk_data...
+[nltk_data]   Unzipping corpora/stopwords.zip.
+[nltk_data] Downloading package wordnet to /home/student/nltk_data...
+[nltk_data] Downloading package omw-1.4 to /home/student/nltk_data...
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+sample_text = "The quick brown fox jumps over the lazy dog."
+tokens = sample_text.lower().split()
+\end{lstlisting}
+
+\subsubsection{GloVE}\label{glove}
+
+\begin{lstlisting}[language=Python]
+import numpy as np
+
+def preprocess_text(text: str) -> list:
+    # Convert to lowercase
+    text = text.lower()
+    # Remove punctuation
+    text = ''.join(c for c in text if c not in '.,;:-')
+    tokens = word_tokenize(text)
+    # Remove stopwords
+    stop_words = set(stopwords.words('english'))
+    filtered_tokens = [word for word in tokens if word not in stop_words]
+    return tokens
+
+def load_glove_model(file) -> dict:
+    # init an empty dict to store "word" as key and its "embedding" as value.
+    glove_model = {}
+    with open(file,'r') as f:
+        for line in f:
+            split_line = line.split()
+            word = split_line[0]
+            embedding = np.array(split_line[1:], dtype=np.float64)
+            glove_model[word] = embedding
+    return glove_model
+
+embedding_dict = load_glove_model("../data/glove.6B.50d.txt")
+
+# Let's check embeddings of a word
+hello_embedding = embedding_dict['hello']
+print(hello_embedding)
+# Let's print the embedding vector dimension
+# This should be 300 as we are using the pretrained model, which generates 300 dim embedding vector
+print(hello_embedding.shape)
+\end{lstlisting}
+
+\begin{lstlisting}
+[-0.38497   0.80092   0.064106 -0.28355  -0.026759 -0.34532  -0.64253
+ -0.11729  -0.33257   0.55243  -0.087813  0.9035    0.47102   0.56657
+  0.6985   -0.35229  -0.86542   0.90573   0.03576  -0.071705 -0.12327
+  0.54923   0.47005   0.35572   1.2611   -0.67581  -0.94983   0.68666
+  0.3871   -1.3492    0.63512   0.46416  -0.48814   0.83827  -0.9246
+ -0.33722   0.53741  -1.0616   -0.081403 -0.67111   0.30923  -0.3923
+ -0.55002  -0.68827   0.58049  -0.11626   0.013139 -0.57654   0.048833
+  0.67204 ]
+(50,)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python]
+# Now let's create the embedding matrix for sample_text
+sample_tokens = preprocess_text(sample_text)
+sample_embedding_matrix = []
+
+for sample_token in sample_tokens:
+    sample_embedding_matrix.append(embedding_dict[sample_token])
+
+# we should have as many embedding vectors (rows of embedding matrix) as there are sample tokens
+assert len(sample_embedding_matrix) == len(sample_tokens)
+
+# lets print a token and its embedding
+print(sample_tokens[2])
+print(sample_embedding_matrix[2])
+\end{lstlisting}
+
+\begin{lstlisting}
+brown
+[-0.88497   0.71685  -0.40379  -0.10698   0.81457   1.0258   -1.2698
+ -0.49382  -0.27839  -0.92251  -0.49409   0.78942  -0.20066  -0.057371
+  0.060682  0.30746   0.13441  -0.49376  -0.54788  -0.81912  -0.45394
+  0.52098   1.0325   -0.8584   -0.65848  -1.2736    0.23616   1.0486
+  0.18442  -0.3901    2.1385   -0.45301  -0.16911  -0.46737   0.15938
+ -0.095071 -0.26512  -0.056479  0.63849  -1.0494    0.037507  0.76434
+ -0.6412   -0.59594   0.46589   0.31494  -0.34072  -0.59167  -0.31057
+  0.73274 ]
+\end{lstlisting}

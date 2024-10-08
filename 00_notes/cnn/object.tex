@@ -1,0 +1,438 @@
+\chapter{Introduction to Object Detection and Segmentation}
+\href{https://www.youtube.com/watch?v=YrwPc8_BJoQ&ab_channel=Udacity}{Youtube} \newline
+
+When performing computer vision on images, we can ask a neural network to complete different types of tasks, with varying complexity:
+
+\includegraphics[width=1\linewidth]{img//cnn//object/tasks.jpg}
+
+
+\begin{table}
+\centering
+
+\begin{tabular}{| l | l | l |}
+\hline
+\textbf{Image} & \textbf{Task} & \textbf{Objective} \\
+\hline
+
+\hline
+a & \textbf{Image classification} & Assign one or more labels to an image \\
+\hline
+b & \textbf{Object localization} & Assign a label to most prominent object, define a box around that object \\
+\hline
+c & \textbf{Object detection} & Assign a label and define a box for \textit{all} objects in an image \\
+\hline
+d & \textbf{Semantic segmentation} & Determine the class of each \textit{pixel} in the image \\
+\hline
+e & \textbf{Instance segmentation} & Determine the class of each \textit{pixel} in the image distinguishing different instances of the same class \\
+\hline
+
+\end{tabular}
+
+\end{table}
+
+In this lesson we will focus on \textit{object localization}, \textit{object detection} and \textit{semantic segmentation}. These topics could easily fill an entire class. In this lesson we are going to look at a core set of concepts and solutions that will help you get started on these fascinating topics, with no intention of being complete.\newline
+
+In particular we are going to focus on two workhorse architectures for object detection and semantic segmentation, respectively: RetinaNet and UNet.
+
+\section{Lesson Outline}
+In this lesson, you will learn how to:
+
+\begin{itemize}
+    \item Define object localization and object detection
+    \item Describe one-stage object detection, and study in particular the RetinaNet architecture
+    \item Describe and define some common metrics to evaluate object detection models
+    \item Train and evaluate a RetinaNet model on a custom dataset
+    \item Define the task of image segmentation
+    \item Describe a semantic segmentation architecture called UNet
+    \item Train and evaluate a UNet model on a custom dataset
+\end{itemize}
+
+\section{Object Localization}
+\href{https://www.youtube.com/watch?v=vsmhBTeNh9g&t=2s&ab_channel=Udacity}{Youtube} \newline
+
+\subsection{Object Localization and Bounding Boxes}
+
+\textbf{Object localization} is the task of assigning a label and determining the bounding box of an object of interest in an image.\newline
+
+A \textbf{bounding box} is a rectangular box that completely encloses the object, whose sides are parallel to the sides of the image.
+
+\includegraphics[width=0.5\linewidth]{img//cnn//object/localization.jpeg}
+\captionof{figure}{Bounding Box (in Red) for the Car}
+
+There are different ways of describing a bounding box, but they all require 4 numbers. These are some examples:
+
+\includegraphics[width=0.5\linewidth]{img//cnn//object/bounding-boxes.jpg}
+\captionof{figure}{Three of the Different Ways of Describing a Bounding Box with 4 Numbers}
+
+Note in these images above that x\_min, y\_min is in the upper left. Images in deep learning are usually indexed as matrices, starting from the upper left. So if an image is 100 x 100, then (0,0) is the point in the upper left, and (99,99) is the point in the lower right.
+
+
+\subsubsection{Architecture of Object Localization Networks}
+
+The architecture of an object localization network is similar to the architecture of a classification network, but we add one more head (the localization head) on top of the existing classification head:
+
+\includegraphics[width=1\linewidth]{img//cnn//object/obj-loc-arch.jpg}
+
+\subsubsection{A Multi-Head Model in PyTorch}
+
+A \textbf{multi-head model} is a CNN where we have a backbone as typical for CNNs, but more than one head. For example, for object localization this could look like:
+\begin{lstlisting}
+from torch import nn
+
+
+class MultiHead(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # Backbone: this can be a custom network, or a
+        # pre-trained network such as a resnet50 where the
+        # original classification head has been removed. It computes
+        # an embedding for the input image
+        self.backbone = nn.Sequential(..., nn.Flatten())
+
+        # Classification head: an MLP or some other neural network
+        # ending with a fully-connected layer with an output vector
+        # of size n_classes
+        self.class_head = nn.Sequential(..., nn.Linear(out_feature, n_classes))
+
+        # Localization head: an MLP or some other neural network
+        # ending with a fully-connected layer with an output vector
+        # of size 4 (the numbers defining the bounding box)
+        self.loc_head = nn.Sequential(..., nn.Linear(out_feature, 4))
+
+    def forward(self, x):
+        x = self.backbone(x)
+
+        class_scores = self.class_head(x)
+        bounding_box = self.loc_head(x)
+
+        return class_scores, bounding_box
+\end{lstlisting}
+
+\subsection{Loss in a Multi-Head Model}
+\href{https://www.youtube.com/watch?v=dZAwj-_5FcE&t=1s&ab_channel=Udacity}{Youtube} \newline
+
+An object localization network, with its two heads, is an example of a multi-head network. Multi-head models provide multiple outputs that are in general paired with multiple inputs. \newline
+
+For example, in the case of object localization, we have 3 inputs as ground truth: the image, the label of the object ("car") and the bounding box for that object (4 numbers defining a bounding box). The object localization network processes the image through the backbone, then the two heads provide two outputs:
+
+\begin{enumerate}
+    \item The class scores, that need to be compared with the input label
+    \item The predicted bounding box, that needs to be compared with the input bounding box.
+\end{enumerate}
+
+The comparison between the input and predicted labels is made using the usual Cross-entropy loss, while the comparison between the input and the predicted bounding boxes is made using, for example, the mean squared error loss. The two losses are then summed to provide the total loss L.
+
+\includegraphics[width=1\linewidth]{img//cnn//object/slide-2.jpeg}
+\captionof{figure}{Loss in a Multi-Head Model}
+
+Since the two losses might be on different scales, we typically add a hyperparameter \(\alpha\) to rescale one of the two: 
+\begin{equation}
+\begin{split}
+L & = CE(\hat{p}) + \alpha MSE(b, \hat{b}) \\
+& = -\log{\hat{p}} + \alpha \sum_{i=1}^4 (b_i - \hat{b}_i)^2
+\end{split}
+\end{equation}
+
+
+\subsubsection{Multiple Losses in PyTorch}
+
+This is an example of a training loop for a multi-head model with multiple losses (in this case, cross-entropy and mean squared error):
+\begin{lstlisting}
+class_loss = nn.CrossEntropyLoss()
+loc_loss = nn.MSELoss()
+alpha = 0.5
+
+...
+for images, labels in train_data_loader:
+    ...
+
+    # Get predictions
+    class_scores, bounding_box = model(images)
+
+    # Compute sum of the losses
+    loss = class_loss(class_scores) + alpha * loc_loss(bounding_box)
+
+    # Backpropagation
+    loss.backward()
+
+
+    optimizer.step()
+\end{lstlisting}
+\section{Object Detection}
+\href{https://www.youtube.com/watch?v=XixevjP3gZQ&ab_channel=Udacity}{Youtube}
+
+\subsection{Object Detection}
+
+The task of \textbf{object detection} consists of detecting and localizing \textit{all} the instances of the objects of interest.
+
+\includegraphics[width=0.5\linewidth]{img//cnn//depth/object-detection.jpeg}
+\captionof{figure}{Detect and Localize \textit{All} the People (in Yellow) and \textit{All} the Cars (in Red, Only One in This Image)}
+
+Different images of course can have a different number of objects of interest: for example an image could have one car, zero cars, or many cars. The same images could also have one person, zero people or many people. In each one of these cases, we need the network to output one vector of class scores plus 4 numbers to define the bounding box for each object. How do we build a network with a variable number of outputs? \newline
+
+It is clear that a network with the same structure as the object localization network would not work, because we would need a variable number of heads depending on the content of the image.\newline
+
+One way would be to slide a window over the image, from the upper left corner to the lower right corner, and for each location of the image we run a normal object localization network. This \textbf{sliding window} approach works to a certain extent, but is not optimal because different objects can have different sizes and aspect ratios. Thus, a window with a fixed size won't fit well all objects of all sizes. For example, let's consider cars: depending on how close or far they are, their size in the image will be different. Also, depending on whether we are seeing the back or the front, or the side of the car, the aspect ratio of the box bounding the object would be pretty different. This becomes even more extreme if we consider objects from different classes, for example cars and people:
+
+\includegraphics[width=0.5\linewidth]{img//cnn//depth/ooexample.jpeg}
+\captionof{figure}{Objects in images have different scales and aspect ratios, so a window that is optimal for an object type at a certain scale won't be optimal for a different scale or a different object class}
+
+Nowadays there are two approaches to solving the problem of handling a variable number of objects, and of their different aspect ratios and scales:
+
+\subsubsection{1) One-stage object detection}
+
+We consider a fixed number of windows with different scales and aspect ratios, centered at fixed locations (\textbf{anchors}). The output of the network then has a fixed size. The localization head will output a vector with a size of 4 times the number of anchors, while the classification head will output a vector with a size equal to the number of anchors multiplied by the number of classes.
+
+\subsubsection{2) Two-stage object detection}
+
+In the first stage, an algorithm or a neural network proposes a fixed number of windows in the image. These are the places in the image with the highest likelihood of containing objects. Then, the second stage considers those and applies object localization, returning for each place the class scores and the bounding box. \newline
+
+In practice, the difference between the two is that while the first type has fixed anchors (fixed windows in fixed places), the second one optimizes the windows based on the content of the image. \newline
+
+In this lesson we are only going to treat one-stage object detection.
+
+\subsubsection{Additional Optional Resources for Two-Stage Object Detection}
+
+I recommend exploring these resources if you are interested!
+
+\begin{itemize}
+    \item \href{https://www.youtube.com/watch?v=6I3m0SsLPo4}{\textbf{Video: Two-stage object detection}}
+    \item An approachable paper reviewing \href{https://iopscience.iop.org/article/10.1088/1742-6596/1544/1/012033/meta}{\textbf{object detection algorithms}} (both one-stage and two-stage)
+\end{itemize}
+
+\section{One-Stage Object Detection: RetinaNet}
+\href{https://www.youtube.com/watch?v=RaWxVVY6tXk&ab_channel=Udacity}{Youtube} \newline
+
+The RetinaNet network is an example of a one-stage object detection algorithm. Like many similar algorithms, it uses \textbf{anchors} to detect objects at different locations in the image, with different scales and aspect ratios.\newline
+
+\textbf{Anchors} are windows with different sizes and different aspect ratios, placed in the center of cells defined by a grid on the image:
+
+\includegraphics[width=0.5\linewidth]{img//cnn//depth/anchors.jpeg}
+\captionof{figure}{Grid (in Green) and Windows (in Red)}
+
+We divide the image with a regular grid. Then for each grid cell we consider a certain number of windows with different aspect ratios and different sizes. We then "anchor" the windows in the center of each cell. If we have 4 windows and 45 cells, then we have 180 anchors. \newline
+
+We run a localization network considering the content of each anchor. If the class scores for a particular class are high for an anchor, then we consider that object detected for that anchor, and we take the bounding box returned by the network as the localization of that object. \newline
+
+This tends to return duplicated objects, so we post-process the output with an algorithm like \href{https://learnopencv.com/non-maximum-suppression-theory-and-implementation-in-pytorch/}{\textbf{Non Maximum Suppression}}.
+
+\subsection{Feature Pyramid Networks (FPNs)}
+
+RetinaNet uses a special backbone called Feature Pyramid Network. \newline
+
+\href{https://www.youtube.com/watch?v=xV-0rtuuStE&ab_channel=Udacity}{Youtube} \newline
+
+The \href{https://arxiv.org/abs/1612.03144}{\textbf{Feature Pyramid Network}} is an architecture that extracts multi-level, semantically-rich feature maps from an image:
+
+\includegraphics[width=1\linewidth]{img//cnn//depth/fpn.jpeg}
+\captionof{figure}{Feature Pyramid Network}
+
+A regular CNN backbone of convolution, pooling, and other typical CNN layers is used to extract multiple feature maps from the original image (downsampling path). The last feature map contains the most semantic-rich representation, which is also the least detailed because of the multiple pooling. So, we copy that to the upsampling path and run object detection with anchors on that. Then, we upsample it and sum it to the feature map from the same level in the downsampling path. This means we are mixing the high-level, abstract information from the feature map in the upsampling path to the more detailed view from the downsampling path. We then run object detection on the result. We repeat this operation several times (3 times in total in this diagram). This is how RetinaNet uses the Feature Pyramid Network:
+
+\includegraphics[width=1\linewidth]{img//cnn//depth/retinanet.jpeg}
+\captionof{figure}{The RetinaNet Architecture}
+
+RetinaNet conducts object classification and localization by independently employing anchors at each Feature Pyramid level. The diagram above illustrates that the classification subnet and the box regression subnet pass through four convolutional layers with \textit{256} filters. Subsequently, they undergo convolutional layers with \textit{KA} and \textit{4A} filters for the classification and localization, respectively. \newline
+
+Output of classification head will be \(W \times H \times A \times K\). Output of the localization head will be \(W \times H \times A \times 4\).
+
+\subsection{Focal Loss}
+
+The third innovative feature of RetinaNet is the so-called \textbf{Focal Loss.} \newline
+
+\href{https://www.youtube.com/watch?v=NDgix_YVm2A&ab_channel=Udacity}{Youtube} \newline
+
+When using a lot of anchors on multiple feature maps, RetinaNet encounters a significant class balance problem: most of the tens of thousands of anchors used in a typical RetinaNet will not contain objects. The crop of the image corresponding to these anchors will normally be pretty easy to classify as background. So the network will very quickly become fairly confident on the background. The normal cross-entropy loss assigns a low but non-negligible loss even to well-classified examples. For example, let's look at the blue curve here:
+
+\includegraphics[width=0.75\linewidth]{img//cnn//depth/focal-loss.jpeg}
+
+Here we are considering for simplicity a binary classification problem. Let's consider an example having a positive label. If our network has a confidence on the positive label of 0.8, it means it is classifying this example pretty well: it is assigning the right label, with a good confidence of 0.8. However, the loss for this example is still around 0.5. Let's now consider a different positive example, where the network is assigning a probability for the positive class of 0.1. This is a False Negative, and the loss accordingly is pretty high (around 4). Let's now assume that we have 10 examples where the network is correct and has a confidence of 0.8 (and loss of 0.5), and one example where the network is wrong and has a loss of 4. The ten examples will have a cumulative loss of 0.5 x 10 = 5, which is larger than 4. In other words, the cumulative loss of the examples that are already classified well is going to dominate over the loss of the example that is classified wrong. This means that the backpropagation will try to make the network more confident on the 10 examples it is already classifying well, instead of trying to fix the one example where the network is wrong. This has catastrophic consequences for networks like RetinaNet, where there are usually tens of thousands of easy background anchors for each anchor containing an object.
+
+The \textbf{Focal Loss} adds a factor in front of the normal cross-entropy loss to dampen the loss due to examples that are already well-classified so that they do not dominate. This factor introduces a hyperparameter \(\gamma\): the larger \(\gamma\), the more the loss of well-classified examples is suppressed.
+
+\subsection{RetinaNet Summary}
+
+Summarizing, RetinaNet is characterized by three key features:
+
+\begin{itemize}
+    \item Anchors
+    \item Feature Pyramid Networks
+    \item Focal loss
+\end{itemize}
+
+\section{Object Detection Metrics}
+\href{https://www.youtube.com/watch?v=lfAoIpBKG5A&t=13s&ab_channel=Udacity}{Youtube} \newline
+
+Before continuing, make sure you recall the meaning of concepts of \href{https://en.wikipedia.org/wiki/Precision_and_recall}{\textbf{True Positives, True Negatives, False Positives, False Negatives, and Precision and Recall}}. These terms are also briefly reviewed in the videos on this page.
+
+\subsection{Intersection over Union (IoU)}
+
+The \textbf{IoU} is a measure of how much two boxes (or other polygons) coincide. As the name suggests, it is the ratio between the area of the intersection, or overlap, and the area of the union of the two boxes or polygons:
+
+\includegraphics[width=0.5\linewidth]{img//cnn//depth/iou-2.jpeg}
+
+IoU is a fundamental concept useful in many domains, and is a key metric for the evaluation of object detection algorithms. \newline
+
+\href{https://www.youtube.com/watch?v=hkBC6WSydIk&ab_channel=Udacity}{Youtube}. Note: At 3:07, Giacomo misspoke in this video above - the precision-recall curve is measured by varying the classification confidence threshold, not by varying the IoU threshold, as mentioned in the video. The slides and the text are correct. At 4:14, the video shows the wrong formula. The formula for calculating the Mean Average Recall is \[mAR = \frac{\sum_{i=1}^K AR_i}{K}\]
+
+\includegraphics[width=1\linewidth]{img//cnn//depth/image.png}
+
+\subsection{Mean Average Precision (mAP)}
+
+\textbf{Mean Average Precision (mAP)} conveys a measurement of precision averaged over the different object classes. \newline
+
+Let’s say we have a number of classes. We consider all the binary classification problems obtained by considering each class in turn as positive and all the others as negative.\newline
+
+For each one of these binary sub-problems, we start by drawing the precision-recall curve that is obtained by measuring precision and recall for different confidence level thresholds, while keeping the IoU threshold fixed (for example at 0.5). The confidence level is the classification confidence level, i.e., the maximum of the softmax probabilities coming out of the classification head. For example, we set the confidence threshold to 0.9 and measure precision and recall, then we change the threshold to say 0.89 and measure precision and recall, and so on, until we get to a threshold of 0.1. This constitutes our precision-recall curve:
+
+% \includegraphics[width=0.5\linewidth]{img//cnn//depth/prec-recall-curve.gif}
+
+We then interpolate the precision and recall curve we just obtained by using a monotonically-decreasing interpolation curve, and we take the area under the curve. This represents the so-called Average Precision (AP) for this class:
+
+% \includegraphics[width=0.5\linewidth]{img//cnn//depth/prec-recall-interp.gif}
+
+We repeat this procedure for all classes, then we take the average of the different APs and call that mean Average Precision, or mAP.\newline
+
+A related metric is called mean Average Recall (mAR). Similarly to the mAP, we split our problem into a number of binary classification problems. For each class, we compute the recall curve obtained by varying this time the IoU threshold from 0.5 to 1. We can now consider the integral of the curve. Since we integrate between 0.5 and 1, and Recall is a quantity bounded between 0 and 1, the integral would be bounded between 0 and 0.5. We therefore multiply by 2 to make it a quantity bounded between 0 and 1. Twice the area under the recall curve represents the so-called Average Recall (AR) for this class:
+
+% \includegraphics[width=0.5\linewidth]{img//cnn//depth/iou-recall-curve.gif}
+
+We then take the average of the AR over the different classes, to define the mean Average Recall, or mAR.
+
+\section{Quiz Question}
+
+\includegraphics[width=1\linewidth]{img//cnn//depth/image3.png}
+
+
+\section{Exercise Solution: Object Detection}
+\href{https://www.youtube.com/watch?v=xwxvb2Hnl8U&ab_channel=Udacity}{Youtube} \newline
+
+
+\section{Image Segmentation}
+
+\subsection{Semantic Segmentation}
+
+Semantic segmentation is one key technique of image segmentation. \newline
+
+\href{https://www.youtube.com/watch?v=EoNBzeKfpP8&ab_channel=Udacity}{Youtube} \newline
+
+The task of \textbf{semantic segmentation} consists of classifying each pixel of an image to determine to which class it belongs. For example, if we want to distinguish between people, cars, and background, the output looks like this:
+
+\includegraphics[width=0.5\linewidth]{img//cnn//object/segmentation.jpeg}
+
+In this image we have color-coded the people class as black, the car class as gray, and the background as white. \newline
+
+We have briefly mentioned previously, but are not going to discuss further here, another technique of image segmentation called instance segmentation. But if you are interested in researching it, you can find more information about it \href{https://debuggercafe.com/instance-segmentation-with-pytorch-and-mask-r-cnn/}{\textbf{here}}.
+
+\section{Semantic Segmentation: UNet}
+\href{https://www.youtube.com/watch?v=48yJpOsGlpY&t=26s&ab_channel=Udacity}{Youtube} \newline
+
+The \textbf{UNet} is a specific architecture for semantic segmentation. It has the structure of a standard autoencoder, with an encoder that takes the input image and encodes it through a series of convolutional and pooling layers into a low-dimensional representation. \newline
+
+Then the decoder architecture starts from the same representation and constructs the output mask by using transposed convolutions. However, the UNet adds skip connections between the feature maps at the same level in the encoder and in the decoder, as shown below:
+
+\includegraphics[width=1\linewidth]{img//cnn//object/unet.jpeg}
+
+In the decoder, the feature map coming from the decoder path is concatenated along the channel dimension with the feature map coming from the encoder path. This means that the next transposed convolution layer has access to information with high semantic content coming from the previous decoder layer, along with information with high detail coming from the encoder path. The final segmentation mask is then a lot more detailed than what you would obtain with a simple encoder-decoder architecture without skip connections between the encoder and the decoder. \newline
+
+\href{https://www.youtube.com/watch?v=ZCBJvfm6p8U&ab_channel=Udacity}{Youtube}
+
+\subsubsection{The Dice Loss}
+
+There are a few different losses that one can use for semantic segmentation. One loss that tend to work well in practice is called Dice loss, named after Lee Raymond Dice, who published it in 1945. Here is how Dice loss is calculated: \[Dice\ loss = 1 - \frac{2 \sum_{i=1}^{n_{pix}} p_i y_i}{\sum_{i=1}^{n_{pix}} (p_i + y_i)}\]
+\(p_i\) and \(y_i\) represent the i-th pixel in respectively the prediction mask and the ground truth mask. The sums are taken over all the \(n_{pix}\) pixels in the image. \newline
+
+The Dice loss derives from the F1 score, which is the geometric mean of precision and recall. Consequently, the Dice loss tends to balance precision and recall at the pixel level.
+
+\subsubsection{UNet in PyTorch}
+
+We will use the implementation of UNet provided by the wonderful open-source library \href{https://github.com/chsasank/segmentation_models.pytorch}{\textbf{segmentation\_models for PyTorch}}. The library also implements the Dice loss. \newline
+
+This is how you can define a UNet using this library:
+\begin{lstlisting}
+import segmentation_models_pytorch as smp
+
+# Binary segmentation?
+binary = True
+n_classes = 1
+
+model = smp.Unet(
+        encoder_name='resnet50',
+        encoder_weights='imagenet',
+        in_channels=3,
+        # +1 is for the background
+        classes=n_classes if binary else n_classes + 1)
+\end{lstlisting}
+
+The Dice loss is simply:
+\begin{lstlisting}
+loss = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
+\end{lstlisting}
+\paragraph{Derivation of the Dice Loss (optional, for those who are interested)}
+
+We start from the formula of the \href{https://en.wikipedia.org/wiki/F-score}{\textbf{F1 score}}: \[F_1 = \frac{2TP}{2TP + FN + FP}\]
+Let's consider for simplicity the binary classification problem, and let's imagine we want to segment a car in an image. In semantic segmentation we can define the True Positives (TP), the False Negatives (FN), and the False Positives (FP) as illustrated by the following diagram, where the gray mask is the ground truth mask for the car and the blue mask is the prediction from the model (a bad model in this case, but we use this example to make the illustration easier):
+
+\includegraphics[width=0.25\linewidth]{img//cnn//object/segmentation-tp-fn-fp.jpeg}
+    
+Here \(p_i\) represents the class probability coming from the network, while \(y_i\) is the ground truth. While the \(p_i\) will be numbers between 0 and 1, the \(y_i\) are either 0 (for the background class) or 1 for the foreground class. \newline
+
+Let's start by noting that the denominator in the expression for the F1 score is equal to the area of the blue mask and the area of the gray mask. Indeed, FP + TP represents the area of the blue mask, while TP + FN represents the area of the gray mask, so FP + TP + TP + FN = 2 TP + FP + FN which is the denominator in the F1 expression. We will use this fact shortly. \newline
+
+Let's now see how we can compute TP. We can transform the normal definition into a more continuous one that is simply the sum of the \(p_i\) weighted by the \(p_i\): \[TP = \sum_{i=1}^{n_{pix}} p_i y_i\]
+
+Since \(y_i\) is either 0 or 1, the sum over all the pixels is actually equivalent to the sum of the \(p_i\) limited to the pixels where \(y_i\) is equal to 1. The higher the \(p_i\) is for this subset, which means, the more the network is confident that the positive pixels are indeed positive, the higher the "continuous" TP value will be. \newline
+
+We have noticed above how the denominator of the F1 expression is just the sum of the predicted mask plus the ground truth mask. We can easily transform this into a continuous version where the sum of the predicted mask is the sum over \(p_i\) while the sum of the ground truth mask is the sum over \(y_i\). Then the denominator of the F1 expression becomes: \[2TP + FN + FP = \sum_{i=1}^{n_{pix}}p_i +\sum_{i=1}^{n_{pix}}y_i = \sum_{i=1}^{n_{pix}} (p_i + y_i)\]
+We can now write a "continuous" version of the F1 score - called the Dice coefficient - as: \[Dice\ coeff = \frac{2\sum_{i=1}^{n_{pix}} p_i y_i}{\sum_{i=1}^{n_{pix}} (p_i + y_i)}\]
+
+This coefficient will be at its maximum when the predicted probabilities \(p_i\) are 1 for all the pixels that are positives (i.e., where \(y_i = 1\)) in the ground truth mask, and zero everywhere else. In that case, both the numerator and the denominator will be equal to \(2n_{pix}\), which means that a network with perfect performance will give a Dice coefficient of 1. \newline
+
+This is the opposite of what we want, because we want the loss to decrease when the performance of the network gets better. So we just subtract the Dice coefficient from 1 to give a function that decreases as the performance improves, which is our Dice loss: \[Dice\ loss = 1 - \frac{2\sum_{i=1}^{n_{pix}} p_i y_i}{\sum_{i=1}^{n_{pix}} (p_i + y_i)}\]
+So the Dice loss is equal to 0 only if the output from the network is perfect.
+
+\section{Quiz: Semantic Segmentation}
+
+\includegraphics[width=1\linewidth]{img//cnn//object/imagequiz.png}
+
+\includegraphics[width=1\linewidth]{img//cnn//object/imageQuiz2.png}
+
+\includegraphics[width=1\linewidth]{img//cnn//object/imagequiz3.png}
+
+
+\section{Exercise Solution: Semantic Segmentation}
+
+\subsection{Solution, Part 1: Data Preparation}
+\href{https://www.youtube.com/watch?v=MxdCYmnUSnQ&t=1s}{Youtube}
+
+\subsection{Solution, Part 2: Architecture, Training, Results}
+\href{https://www.youtube.com/watch?v=Mz0UodyanGA&t=1s}{Youtube}
+
+
+\section{Glossary}
+
+For your reference, here are all the key new terms we introduced in this lesson:
+
+\textbf{Object localization}: The task of determining if an image contains an object, and localize it with a bounding box.
+
+\textbf{Bounding box}: A rectangular box that completely encloses a given object in an image, whose sides are parallel to the sides of the image.
+
+\textbf{Multi-head model}: A CNN where we have one backbone but more than one head.
+
+\textbf{Object detection}: The task of localizing using a bounding box every object of interest in an image.
+
+\textbf{Anchors:} Windows with different sizes and different aspect ratios, placed in the center of cells defined by a grid on an image.
+
+\textbf{Feature Pyramid Network (FPN)}: An architecture that extracts multi-level, semantically-rich feature maps from an image.
+
+\textbf{Focal Loss:} A modification of the Cross-Entropy Loss, **\textbf{by} **including a factor in front of the CE Loss to dampen the loss due to examples that are already well-classified, so they do not dominate.
+
+\textbf{Mean Average Recall (mAR)}: A metric for object detection algorithms. It is obtained by computing the Average Recall for each class of objects, as twice the integral of the Recall vs IoU curve, and then by averaging the Average Recall for each class.
+
+\textbf{Mean Average Precision (mAP)}: A metric for object detection algorithms. It is obtained by computing the Average Precision (AP) for each class. The AP is computed by integrating an interpolation of the Precision-Recall curve. The mAP is the mean average of the AP over the classes.
+
+\textbf{Intersection over Union (IoU):} The ratio between the area of the intersection, or overlap, and the area of the union of two boxes or polygons. Used to measure how much two boxes coincide.
+
+\textbf{Semantic segmentation}: The task of assigning a class to each pixel in an image.
+
+\textbf{Dice loss:} A useful measure of loss for semantic segmentation derived from the F1 score, which is the geometric mean of precision and recall. The Dice loss tends to balance precision and recall at the pixel level.

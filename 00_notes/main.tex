@@ -1,0 +1,65 @@
+\documentclass{book}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{capt-of}
+\usepackage{enumitem}
+
+\usepackage{xcolor}
+\definecolor{ipython_cyan}{RGB}{64, 128, 128}
+\definecolor{maroon}{cmyk}{0, 0.87, 0.68, 0.32}
+\definecolor{halfgray}{gray}{0.55}
+\definecolor{ipython_frame}{RGB}{207, 207, 207}
+\definecolor{ipython_bg}{RGB}{247, 247, 247}
+\definecolor{ipython_red}{RGB}{186, 33, 33}
+\definecolor{ipython_green}{RGB}{0, 128, 0}
+\definecolor{ipython_purple}{RGB}{170, 34, 255}
+
+\usepackage{listings} % package for code blocks
+\lstset{language=Python,
+frame=single,
+basicstyle=\scriptsize\ttfamily,
+breaklines=true,
+keepspaces=true,
+commentstyle=\color{halfgray}\itshape\ttfamily,
+keywordstyle=\color{ipython_green}\bfseries\ttfamily,
+identifierstyle=\color{black}\ttfamily,
+stringstyle=\color{ipython_red}\ttfamily
+%numbers=left,
+%stepnumber=2,
+%numberstyle=\tiny\color{halfgray},s
+%framexleftmargin=6mm
+}
+\title{Nanodegree Introduction to Deep Learning}
+\author{Susanna Olinda Kusrini}
+\date{January 2023}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+
+\input{intro/intro}
+\input{intro/deeplearning}
+\input{intro/gradientdescent}
+\input{intro/introNN}
+\input{intro/trainingNN}
+\input{cnn/intro}
+\input{cnn/concepts}
+\input{cnn/depth}
+\input{cnn/transferlearning}
+\input{cnn/autoencoders}
+\input{cnn/object}
+\input{rnn/intro}
+\input{rnn/lstm}
+\input{rnn/transformers}
+\input{genAdvNet/intro}
+\input{genAdvNet/gan}
+\input{genAdvNet/deepGAN}
+\input{genAdvNet/image2image}
+\input{genAdvNet/modernGAN}
+
+%jdfjdfhdf \verb|while| fdgdfgfdg
+
+%\subsection{Lalala}
+\end{document}
